@@ -113,6 +113,6 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ## 6. Dashboard and polish
 
-- [ ] `w status` — full project dashboard (worktrees + servers + ports)
-- [ ] Formatted terminal output (colors, alignment)
-- [ ] Zsh completions (`completions/_w`)
+- [x] `w status` — full project dashboard (worktrees + servers + ports)
+- [x] Formatted terminal output (colors, alignment)
+- [x] Zsh completions (`completions/_w`)

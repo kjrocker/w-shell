@@ -51,9 +51,14 @@ RUN_ARGS=(
     -v "${HOME}/.claude/settings.json:/home/claude/.claude/settings.json:ro,z"
 )
 
+# For podman: keep host UID mapping so mounted files are readable
+if [ "$CONTAINER_RUNTIME" = "podman" ]; then
+    RUN_ARGS+=(--userns=keep-id)
+fi
+
 # Mount credentials file if it exists (for OAuth-based auth)
 if [ -f "${HOME}/.claude/.credentials.json" ]; then
-    RUN_ARGS+=(-v "${HOME}/.claude/.credentials.json:/home/claude/.claude/.credentials.json:ro,z")
+    RUN_ARGS+=(-v "${HOME}/.claude/.credentials.json:/home/claude/.claude/.credentials.json:z")
 fi
 
 # Optional: limit resources

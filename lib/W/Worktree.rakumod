@@ -59,6 +59,14 @@ sub worktree-dirty(IO::Path :$path --> Bool) is export {
     $proc.out.slurp(:close).trim.chars > 0;
 }
 
+sub worktree-dirty-count(IO::Path :$path --> Int) is export {
+    my $proc = run 'git', '-C', $path.Str, 'status', '--porcelain', :out, :err;
+    return 0 unless $proc.exitcode == 0;
+    my $output = $proc.out.slurp(:close).trim;
+    return 0 unless $output;
+    $output.lines.elems;
+}
+
 sub worktree-ahead-behind(IO::Path :$path --> Str) is export {
     my $proc = run 'git', '-C', $path.Str, 'rev-list', '--left-right', '--count', 'HEAD...@{upstream}',
                     :out, :err;

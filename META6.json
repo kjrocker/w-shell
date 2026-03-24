@@ -13,7 +13,8 @@
         "W::Setup": "lib/W/Setup.rakumod",
         "W::Git::Porcelain": "lib/W/Git/Porcelain.rakumod",
         "W::Slots": "lib/W/Slots.rakumod",
-        "W::Server": "lib/W/Server.rakumod"
+        "W::Server": "lib/W/Server.rakumod",
+        "W::Display": "lib/W/Display.rakumod"
     },
     "depends": ["TOML::Thumb"],
     "build-depends": [],

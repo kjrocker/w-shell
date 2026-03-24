@@ -7,6 +7,7 @@ use W::Nav;
 use W::Setup;
 use W::Slots;
 use W::Server;
+use W::Display;
 
 multi MAIN('ls') {
     my $root = find-repo-root();
@@ -17,14 +18,18 @@ multi MAIN('ls') {
     for @worktrees -> %wt {
         my $path = %wt<path>.IO;
         my $name = %wt<branch> // (%wt<detached>:exists ?? '(detached)' !! '(unknown)');
-        my $marker = $current-path.starts-with(%wt<path>) ?? '*' !! ' ';
-        my $dirty = worktree-dirty(path => $path) ?? 'dirty' !! 'clean';
-        my $ab = worktree-ahead-behind(path => $path);
-        my @cols = $marker, sprintf('%-15s', $name), $dirty;
+        my $is-current = $current-path.starts-with(%wt<path>);
+        my $marker = $is-current ?? bold-green('*') !! ' ';
+        my $display-name = $is-current ?? bold($name) !! $name;
+        my $dirty = worktree-dirty(path => $path);
+        my $count = $dirty ?? worktree-dirty-count(path => $path) !! 0;
+        my $status = format-status($dirty, $count);
+        my $ab = format-ahead-behind(worktree-ahead-behind(path => $path));
+        my @cols = $marker, sprintf('%-15s', $display-name), $status;
         @cols.push($ab) if $ab;
         # Append server status if running
         my $srv-status = server-status-line($name, %ports);
-        @cols.push($srv-status) if $srv-status;
+        @cols.push(format-server-status($srv-status)) if $srv-status;
         say @cols.join('  ');
     }
 }
@@ -51,16 +56,20 @@ multi MAIN('status') {
     my %ports = read-ports($root);
     my $proj = project-name($root);
 
-    say "$proj — {@worktrees.elems} worktree{@worktrees.elems == 1 ?? '' !! 's'}";
+    say bold("$proj") ~ " — {@worktrees.elems} worktree{@worktrees.elems == 1 ?? '' !! 's'}";
     say '';
 
     for @worktrees -> %wt {
         my $path = %wt<path>.IO;
         my $name = %wt<branch> // (%wt<detached>:exists ?? '(detached)' !! '(unknown)');
-        my $marker = $current-path.starts-with(%wt<path>) ?? '*' !! ' ';
-        my $dirty = worktree-dirty(path => $path) ?? 'dirty' !! 'clean';
-        my $ab = worktree-ahead-behind(path => $path);
-        my @cols = $marker, sprintf('%-15s', $name), $dirty;
+        my $is-current = $current-path.starts-with(%wt<path>);
+        my $marker = $is-current ?? bold-green('*') !! ' ';
+        my $display-name = $is-current ?? bold($name) !! $name;
+        my $dirty = worktree-dirty(path => $path);
+        my $count = $dirty ?? worktree-dirty-count(path => $path) !! 0;
+        my $status = format-status($dirty, $count);
+        my $ab = format-ahead-behind(worktree-ahead-behind(path => $path));
+        my @cols = $marker, sprintf('%-15s', $display-name), $status;
         @cols.push($ab) if $ab;
         say @cols.join('  ');
 
@@ -68,7 +77,8 @@ multi MAIN('status') {
         my @srv = server-status-block($name, %ports);
         for @srv.kv -> $i, $s {
             my $connector = $i == @srv.elems - 1 ?? '└' !! '├';
-            say "              $connector {$s<name>}  :{$s<port>}  ({$s<status>})";
+            my $srv-status = $s<alive> ?? green("pid {$s<status>.subst('pid ', '')}") !! red("stopped");
+            say "              $connector {$s<name>}  " ~ cyan(":{$s<port>}") ~ "  ($srv-status)";
         }
     }
 }

@@ -1,0 +1,62 @@
+#compdef w
+
+# Zsh completion for w (w-raku worktree manager)
+
+_w_worktree_names() {
+    local -a worktrees
+    worktrees=(${(f)"$(git worktree list --porcelain 2>/dev/null | grep '^branch ' | sed 's|^branch refs/heads/||')"})
+    _describe 'worktree' worktrees
+}
+
+_w() {
+    local -a subcommands
+    subcommands=(
+        'ls:List all worktrees with status'
+        'rm:Remove a worktree'
+        'exit:Navigate to project root'
+        'status:Show project dashboard'
+        'serve:Start dev servers for a worktree'
+        'stop:Stop dev servers for a worktree'
+    )
+
+    if (( CURRENT == 2 )); then
+        # First argument: subcommand or worktree name
+        _alternative \
+            'subcommands:subcommand:_describe "subcommand" subcommands' \
+            'worktrees:worktree:_w_worktree_names'
+        return
+    fi
+
+    case "${words[2]}" in
+        rm)
+            if (( CURRENT == 3 )); then
+                _w_worktree_names
+            elif (( CURRENT == 4 )); then
+                _arguments '--force[Force removal even with unmerged commits]'
+            fi
+            ;;
+        serve)
+            if (( CURRENT == 3 )); then
+                _w_worktree_names
+            else
+                _arguments '--only=[Start only the named server]:server name'
+            fi
+            ;;
+        stop)
+            if (( CURRENT == 3 )); then
+                _w_worktree_names
+            fi
+            ;;
+        ls|exit|status)
+            # No further arguments
+            ;;
+        *)
+            # w <name> <cmd...> — after worktree name, complete commands
+            if (( CURRENT >= 3 )); then
+                _command_names
+            fi
+            ;;
+    esac
+}
+
+_w "$@"
