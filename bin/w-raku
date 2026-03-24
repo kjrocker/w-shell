@@ -6,6 +6,7 @@ use W::Config;
 use W::Nav;
 use W::Setup;
 use W::Slots;
+use W::Server;
 
 multi MAIN('ls') {
     my $root = find-repo-root();
@@ -26,6 +27,7 @@ multi MAIN('ls') {
 
 multi MAIN('rm', Str $name, Bool :$force) {
     my $root = find-repo-root();
+    stop-servers(:$name, repo-root => $root);
     note "Removing worktree $name...";
     remove-worktree(:$name, repo-root => $root, :$force);
     free-slot(:$name, repo-root => $root);
@@ -43,11 +45,27 @@ multi MAIN('status') {
 }
 
 multi MAIN('serve', Str $name?, Str :$only) {
-    say "TODO: start servers" ~ ($name ?? " for $name" !! '') ~ ($only ?? " (only $only)" !! '');
+    my $root = find-repo-root();
+    my %config = load-config($root);
+    my $wt-name = $name // do {
+        # Determine current worktree name from cwd
+        my @wts = list-worktrees(repo-root => $root);
+        my $cwd = $*CWD.Str;
+        my $current = @wts.first({ $cwd.starts-with(.<path>) });
+        $current ?? ($current<branch> // 'main') !! 'main';
+    };
+    start-servers(:name($wt-name), repo-root => $root, :%config, :$only);
 }
 
 multi MAIN('stop', Str $name?) {
-    say "TODO: stop servers" ~ ($name ?? " for $name" !! '');
+    my $root = find-repo-root();
+    my $wt-name = $name // do {
+        my @wts = list-worktrees(repo-root => $root);
+        my $cwd = $*CWD.Str;
+        my $current = @wts.first({ $cwd.starts-with(.<path>) });
+        $current ?? ($current<branch> // 'main') !! 'main';
+    };
+    stop-servers(:name($wt-name), repo-root => $root);
 }
 
 multi MAIN(Str $name, *@cmd) {

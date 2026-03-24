@@ -95,14 +95,14 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 5a. Serve/stop (`lib/W/Server.rakumod`)
 
-- [ ] Implement `start-servers` using `Proc::Async`
+- [x] Implement `start-servers` using `Proc::Async`
   - Read `[[server]]` entries from config
   - Compute port as `base-port + slot`
   - Set env var (`port-env`) for each server process
   - Track PIDs in `ports.json`
-- [ ] Implement `stop-servers` — signal tracked PIDs, clean up state
-- [ ] Wire into `MAIN('serve', ...)` and `MAIN('stop', ...)`
-- [ ] `w rm` stops servers before removing
+- [x] Implement `stop-servers` — signal tracked PIDs, clean up state
+- [x] Wire into `MAIN('serve', ...)` and `MAIN('stop', ...)`
+- [x] `w rm` stops servers before removing
 
 ### 5b. Port exposure
 
