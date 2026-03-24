@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="0.0.1"
+STATE_DIR="${W_STATE_DIR:-${HOME}/.local/state/w}"
+
+# --- Project discovery ---
+
+_w_find_root() {
+  git rev-parse --show-toplevel 2>/dev/null || { echo "Not inside a git repository" >&2; exit 1; }
+}
+
+_w_project_name() {
+  basename "$1"
+}
+
+_w_parent_dir() {
+  dirname "$1"
+}
+
+_w_find_main_worktree() {
+  local output
+  output=$(git worktree list 2>/dev/null) || { echo "Not inside a git repository" >&2; exit 1; }
+  echo "$output" | head -1 | awk '{print $1}'
+}
+
+# --- cd-target ---
+
+_w_cd_target() {
+  mkdir -p "$STATE_DIR"
+  printf '%s' "$1" > "$STATE_DIR/cd-target"
+}
+
+# --- Color helpers ---
+
+_w_use_color() {
+  [[ -z "${NO_COLOR:-}" ]] && [[ -t 2 ]]
+}
+
+_w_color() {
+  local code="$1" text="$2"
+  if _w_use_color; then
+    printf '%b%s\e[0m' "$code" "$text"
+  else
+    printf '%s' "$text"
+  fi
+}
+
+_w_bold()       { _w_color '\e[1m' "$1"; }
+_w_green()      { _w_color '\e[32m' "$1"; }
+_w_red()        { _w_color '\e[31m' "$1"; }
+_w_yellow()     { _w_color '\e[33m' "$1"; }
+_w_cyan()       { _w_color '\e[36m' "$1"; }
+_w_dim()        { _w_color '\e[2m' "$1"; }
+_w_bold_green() { _w_color '\e[1m\e[32m' "$1"; }
+
+# --- Subcommands ---
+
+_w_cmd_version() {
+  echo "w $VERSION"
+}
+
+_w_cmd_help() {
+  cat >&2 <<'EOF'
+Usage: w <name>          Switch to (or create) worktree
+       w <name> <cmd>    Run command in worktree
+       w ls              List worktrees
+       w status          Project dashboard
+       w rm <name>       Remove worktree
+       w exit            Return to main worktree
+       w serve [name]    Start dev servers
+       w stop [name]     Stop dev servers
+       w --version       Print version
+       w --help          Show this help
+EOF
+}
+
+# --- Main router ---
+
+main() {
+  local cmd="${1:-}"
+  case "$cmd" in
+    ls)        shift; _w_cmd_ls "$@" ;;
+    rm)        shift; _w_cmd_rm "$@" ;;
+    exit)      shift; _w_cmd_exit "$@" ;;
+    status)    shift; _w_cmd_status "$@" ;;
+    serve)     shift; _w_cmd_serve "$@" ;;
+    stop)      shift; _w_cmd_stop "$@" ;;
+    --version) _w_cmd_version ;;
+    --help)    _w_cmd_help ;;
+    "")        _w_cmd_help ;;
+    *)         _w_cmd_go "$@" ;;
+  esac
+}
+
+# Allow sourcing for tests: `source bin/w --source-only`
+if [[ "${1:-}" != "--source-only" ]]; then
+  main "$@"
+fi

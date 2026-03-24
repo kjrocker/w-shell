@@ -1,11 +1,11 @@
-# w-raku shell integration
+# w shell integration
 # Source this file in your .zshrc:
 #   source /path/to/w-raku/shell/w.zsh
 
-W_RAKU_ROOT="${W_RAKU_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}"
+W_ROOT="${W_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}"
 
 w() {
-  raku -I"$W_RAKU_ROOT/lib" "$W_RAKU_ROOT/bin/w-raku" "$@"
+  "$W_ROOT/bin/w" "$@"
   local target="$HOME/.local/state/w/cd-target"
   if [[ -f "$target" ]]; then
     cd "$(cat "$target")"

@@ -4,19 +4,19 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 1. Scaffold and core infrastructure
 
-- [ ] Create `bin/w` with: shebang, `set -euo pipefail`, state dir constant (`~/.local/state/w`), project discovery functions:
+- [x] Create `bin/w` with: shebang, `set -euo pipefail`, state dir constant (`~/.local/state/w`), project discovery functions:
   - `_w_find_root` — prints `git rev-parse --show-toplevel`, dies if not in a repo
   - `_w_project_name root` — prints basename of repo root
   - `_w_parent_dir root` — prints dirname of repo root
   - `_w_find_main_worktree` — prints path of first worktree from `git worktree list`
-- [ ] Add `_w_cd_target path` — writes `path` to `$STATE_DIR/cd-target`, creating parent dirs via `mkdir -p`
-- [ ] Add color helpers respecting `NO_COLOR` env and `[ -t 1 ]` TTY check:
+- [x] Add `_w_cd_target path` — writes `path` to `$STATE_DIR/cd-target`, creating parent dirs via `mkdir -p`
+- [x] Add color helpers respecting `NO_COLOR` env and `[ -t 1 ]` TTY check:
   - `_w_color code text` — wraps text in ANSI escape if color enabled, no-op otherwise
   - `_w_bold`, `_w_green`, `_w_red`, `_w_yellow`, `_w_cyan`, `_w_dim`, `_w_bold_green` — each calls `_w_color` with the appropriate code(s)
-- [ ] Add main router — `case "$1"` at bottom of file dispatching `ls|rm|exit|status|serve|stop|--version|--help` to `_w_cmd_*` functions, default case calls `_w_cmd_go`
-- [ ] Add `shell/w.zsh` — sourceable wrapper: calls `bin/w "$@"`, then if `$STATE_DIR/cd-target` exists, reads it into `cd`, deletes the file
-- [ ] Set up bats scaffolding: `t/helpers.bash` with `setup()` that creates a temp git repo (init + initial commit), `teardown()` that cleans up; first test file `t/01-core.bats` verifying `_w_find_root` returns the temp repo path
-- [ ] Tests pass, `bin/w --version` prints version string
+- [x] Add main router — `case "$1"` at bottom of file dispatching `ls|rm|exit|status|serve|stop|--version|--help` to `_w_cmd_*` functions, default case calls `_w_cmd_go`
+- [x] Add `shell/w.zsh` — sourceable wrapper: calls `bin/w "$@"`, then if `$STATE_DIR/cd-target` exists, reads it into `cd`, deletes the file
+- [x] Set up bats scaffolding: `t/helpers.bash` with `setup()` that creates a temp git repo (init + initial commit), `teardown()` that cleans up; first test file `t/01-core.bats` verifying `_w_find_root` returns the temp repo path
+- [x] Tests pass, `bin/w --version` prints version string
 
 ## 2. Worktree list and porcelain parsing
 
