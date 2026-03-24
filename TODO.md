@@ -29,9 +29,9 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 1c. Wire config into `w <name>`
 
-- [ ] In `bin/w-raku`, load config via `load-config($root)` in the `MAIN(Str $name)` candidate
-- [ ] Pass the `path` template (if present in config) through to `resolve-worktree-path`
-- [ ] Verify end-to-end: config with custom `path` template produces correct worktree location
+- [x] In `bin/w-raku`, load config via `load-config($root)` in the `MAIN(Str $name)` candidate
+- [x] Pass the `path` template (if present in config) through to `resolve-worktree-path`
+- [x] Verify end-to-end: config with custom `path` template produces correct worktree location
 
 ---
 

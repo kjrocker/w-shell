@@ -1,0 +1,41 @@
+use Test;
+use W::Config;
+use W::Project;
+use W::Worktree;
+
+plan 2;
+
+# End-to-end: config with custom path template produces correct worktree location
+{
+    my $tmp = (%*ENV<W_TEST_TMPDIR> // $*TMPDIR).IO.add("w-raku-test-wire-{$*PID}");
+    $tmp.mkdir;
+    LEAVE { run 'rm', '-rf', $tmp.Str }
+
+    my $repo = $tmp.add('myapp');
+    $repo.mkdir;
+    run 'git', '-C', $repo.Str, 'init', '-b', 'main', :out, :err;
+    run 'git', '-C', $repo.Str, 'config', 'user.email', 'test@test', :out, :err;
+    run 'git', '-C', $repo.Str, 'config', 'user.name', 'Test', :out, :err;
+    run 'git', '-C', $repo.Str, 'commit', '--allow-empty', '-m', 'init', :out, :err;
+
+    # Write a config with custom path template
+    $repo.add('.wtconfig.toml').spurt(q:to/END/);
+    path = "{parent}/{project}.worktrees/{name}"
+    END
+
+    my %config = load-config($repo);
+    my $path = resolve-worktree-path(
+        parent   => parent-dir($repo),
+        project  => project-name($repo),
+        name     => 'feat-x',
+        template => %config<path>,
+    );
+
+    is $path.Str, $tmp.add('myapp.worktrees/feat-x').Str,
+       'config path template resolves correctly';
+
+    # Actually create the worktree at the custom path
+    lives-ok {
+        create-worktree(name => 'feat-x', path => $path, repo-root => $repo);
+    }, 'worktree created at custom template path';
+}

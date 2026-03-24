@@ -2,6 +2,7 @@
 use W::Raku;
 use W::Project;
 use W::Worktree;
+use W::Config;
 use W::Nav;
 
 multi MAIN('ls') {
@@ -35,10 +36,12 @@ multi MAIN(Str $name, *@cmd) {
         say "TODO: run '{@cmd.join(' ')}' in worktree $name";
     } else {
         my $root = find-repo-root();
+        my %config = load-config($root);
         my $path = resolve-worktree-path(
-            parent  => parent-dir($root),
-            project => project-name($root),
-            name    => $name,
+            parent   => parent-dir($root),
+            project  => project-name($root),
+            name     => $name,
+            template => %config<path> // Str,
         );
 
         unless worktree-exists(:$path) {
