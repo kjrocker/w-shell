@@ -63,14 +63,13 @@ Columns: name, clean/dirty, ahead/behind, server status if applicable.
 
 ### `w rm <name>` — remove worktree
 
-Remove worktree directory and its branch. Stops any running servers first. Refuses to remove if the branch has unmerged commits (override with `--force`).
+Remove worktree directory. Stops any running servers first. Refuses to remove if the branch has unmerged commits (override with `--force`).
 
 ```
 $ w rm feat-x
 Stopping server frontend (pid 12345)...
 Stopping server backend (pid 12346)...
 Removing worktree feat-x...
-Deleting branch feat-x...
 Done.
 ```
 
