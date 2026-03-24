@@ -5,13 +5,31 @@ use W::Worktree;
 use W::Config;
 use W::Nav;
 use W::Setup;
+use W::Slots;
 
 multi MAIN('ls') {
-    say "TODO: list worktrees";
+    my $root = find-repo-root();
+    my @worktrees = list-worktrees(repo-root => $root);
+    my $current-path = $*CWD.Str;
+
+    for @worktrees -> %wt {
+        my $path = %wt<path>.IO;
+        my $name = %wt<branch> // (%wt<detached>:exists ?? '(detached)' !! '(unknown)');
+        my $marker = $current-path.starts-with(%wt<path>) ?? '*' !! ' ';
+        my $dirty = worktree-dirty(path => $path) ?? 'dirty' !! 'clean';
+        my $ab = worktree-ahead-behind(path => $path);
+        my @cols = $marker, sprintf('%-15s', $name), $dirty;
+        @cols.push($ab) if $ab;
+        say @cols.join('  ');
+    }
 }
 
 multi MAIN('rm', Str $name, Bool :$force) {
-    say "TODO: remove worktree $name" ~ ($force ?? ' (forced)' !! '');
+    my $root = find-repo-root();
+    note "Removing worktree $name...";
+    remove-worktree(:$name, repo-root => $root, :$force);
+    free-slot(:$name, repo-root => $root);
+    note "Done.";
 }
 
 multi MAIN('exit') {
@@ -34,7 +52,17 @@ multi MAIN('stop', Str $name?) {
 
 multi MAIN(Str $name, *@cmd) {
     if @cmd.elems {
-        say "TODO: run '{@cmd.join(' ')}' in worktree $name";
+        my $root = find-repo-root();
+        my %config = load-config($root);
+        my $path = resolve-worktree-path(
+            parent   => parent-dir($root),
+            project  => project-name($root),
+            name     => $name,
+            template => %config<path> // Str,
+        );
+        die "Worktree $name does not exist" unless worktree-exists(:$path);
+        my $proc = run 'sh', '-c', @cmd.join(' '), :cwd($path.Str);
+        exit $proc.exitcode;
     } else {
         my $root = find-repo-root();
         my %config = load-config($root);
@@ -49,6 +77,7 @@ multi MAIN(Str $name, *@cmd) {
         if $is-new {
             note "Creating worktree $name...";
             create-worktree(:$name, :$path, :repo-root($root));
+            assign-slot(:$name, repo-root => $root);
 
             my @setup-cmds = |(%config<setup><commands> // []);
             if @setup-cmds {

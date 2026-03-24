@@ -81,13 +81,13 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ## 4. Slot allocation (`lib/W/Slots.rakumod`)
 
-- [ ] Create state directory structure: `~/.local/state/w/projects/<project-id>/`
-- [ ] Derive `project-id` from repo root path (sanitized or hashed)
-- [ ] Implement `assign-slot` / `free-slot` / `get-slot` operating on `slots.json`
+- [x] Create state directory structure: `~/.local/state/w/projects/<project-id>/`
+- [x] Derive `project-id` from repo root path (sanitized or hashed)
+- [x] Implement `assign-slot` / `free-slot` / `get-slot` operating on `slots.json`
   - Main worktree is always slot 0
   - New worktrees get lowest available slot
-- [ ] Assign slot on worktree creation, free on removal
-- [ ] Tests for slot assignment, reuse of freed slots
+- [x] Assign slot on worktree creation, free on removal
+- [x] Tests for slot assignment, reuse of freed slots
 
 ---
 

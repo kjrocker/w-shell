@@ -10,7 +10,9 @@
         "W::Worktree": "lib/W/Worktree.rakumod",
         "W::Nav": "lib/W/Nav.rakumod",
         "W::Config": "lib/W/Config.rakumod",
-        "W::Setup": "lib/W/Setup.rakumod"
+        "W::Setup": "lib/W/Setup.rakumod",
+        "W::Git::Porcelain": "lib/W/Git/Porcelain.rakumod",
+        "W::Slots": "lib/W/Slots.rakumod"
     },
     "depends": ["TOML::Thumb"],
     "build-depends": [],
