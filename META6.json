@@ -1,0 +1,15 @@
+{
+    "name": "W::Raku",
+    "version": "0.0.1",
+    "description": "A CLI tool",
+    "authors": [],
+    "license": "Artistic-2.0",
+    "provides": {
+        "W::Raku": "lib/W/Raku.rakumod"
+    },
+    "depends": [],
+    "build-depends": [],
+    "test-depends": [
+        "Test"
+    ]
+}
