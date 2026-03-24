@@ -59,23 +59,23 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 3a. `w ls` — list worktrees
 
-- [ ] Create `W::Git::Porcelain` grammar + actions to parse `git worktree list --porcelain` output
-- [ ] Implement `list-worktrees` in `W::Worktree` using the grammar
-- [ ] Wire into `MAIN('ls')` — format output as: name, clean/dirty, ahead/behind
-- [ ] Tests for grammar parsing various porcelain outputs
+- [x] Create `W::Git::Porcelain` grammar + actions to parse `git worktree list --porcelain` output
+- [x] Implement `list-worktrees` in `W::Worktree` using the grammar
+- [x] Wire into `MAIN('ls')` — format output as: name, clean/dirty, ahead/behind
+- [x] Tests for grammar parsing various porcelain outputs
 
 ### 3b. `w rm <name>` — remove worktree
 
-- [ ] Implement `remove-worktree(Str :$name, IO::Path :$repo-root, Bool :$force)` in `W::Worktree`
+- [x] Implement `remove-worktree(Str :$name, IO::Path :$repo-root, Bool :$force)` in `W::Worktree`
   - Refuses if branch has unmerged commits (unless `--force`)
   - Runs `git worktree remove`
-- [ ] Wire into `MAIN('rm', ...)`
-- [ ] Tests for remove (normal case, unmerged refuse, force override)
+- [x] Wire into `MAIN('rm', ...)`
+- [x] Tests for remove (normal case, unmerged refuse, force override)
 
 ### 3c. `w <name> <cmd...>` — run in worktree
 
-- [ ] Implement in `MAIN(Str $name, *@cmd)`: resolve worktree path, run command via shell in that directory
-- [ ] Pass through exit code
+- [x] Implement in `MAIN(Str $name, *@cmd)`: resolve worktree path, run command via shell in that directory
+- [x] Pass through exit code
 
 ---
 

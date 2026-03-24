@@ -1,0 +1,40 @@
+use Test;
+use W::Worktree;
+
+plan 3;
+
+# Setup: create a temp repo with a worktree
+my $tmp = (%*ENV<W_TEST_TMPDIR> // $*TMPDIR).IO.add("w-raku-test-runcmd-{$*PID}");
+$tmp.mkdir;
+LEAVE { run 'rm', '-rf', $tmp.Str }
+
+my $repo = $tmp.add('myapp');
+$repo.mkdir;
+run 'git', '-C', $repo.Str, 'init', '-b', 'main', :out, :err;
+run 'git', '-C', $repo.Str, 'config', 'user.email', 'test@test', :out, :err;
+run 'git', '-C', $repo.Str, 'config', 'user.name', 'Test', :out, :err;
+run 'git', '-C', $repo.Str, 'commit', '--allow-empty', '-m', 'init', :out, :err;
+
+my $wt-path = $tmp.add('myapp.cmd-test');
+create-worktree(name => 'cmd-test', path => $wt-path, repo-root => $repo);
+
+# Test: command runs in worktree directory and captures output
+{
+    my $proc = run 'sh', '-c', 'pwd', :cwd($wt-path.Str), :out;
+    my $output = $proc.out.slurp(:close).trim;
+    # Resolve symlinks for comparison
+    my $real-wt = run('realpath', $wt-path.Str, :out).out.slurp(:close).trim;
+    my $real-out = run('realpath', $output, :out).out.slurp(:close).trim;
+    is $real-out, $real-wt, 'command runs in worktree directory';
+}
+
+# Test: command exit code is passed through
+{
+    my $proc = run 'sh', '-c', 'exit 0', :cwd($wt-path.Str);
+    is $proc.exitcode, 0, 'successful command returns 0';
+}
+
+{
+    my $proc = run 'sh', '-c', 'exit 42', :cwd($wt-path.Str);
+    is $proc.exitcode, 42, 'failing command exit code passed through';
+}
