@@ -108,6 +108,32 @@ sub stop-servers(Str :$name, IO::Path :$repo-root, Str :$only --> List) is expor
     @stopped.list;
 }
 
+# Format a one-line server status string for a worktree (for w ls)
+sub server-status-line(Str $name, %ports --> Str) is export {
+    return '' unless %ports{$name}:exists;
+    my %servers = %ports{$name}<servers> // {};
+    return '' unless %servers.elems;
+    my @live = %servers.kv.map(-> $srv, $info {
+        ($info<pid> && pid-alive($info<pid>.Int))
+            ?? ":{$info<port>}" !! Nil
+    }).grep(*.defined);
+    return '' unless @live;
+    "● server running {@live.join(',')}"
+}
+
+# Format full server status block for w status (multi-line)
+sub server-status-block(Str $name, %ports --> List) is export {
+    return ().list unless %ports{$name}:exists;
+    my %servers = %ports{$name}<servers> // {};
+    return ().list unless %servers.elems;
+    my @entries = %servers.kv.map(-> $srv, $info {
+        my $alive = ($info<pid> && pid-alive($info<pid>.Int));
+        my $status = $alive ?? "pid {$info<pid>}" !! "stopped";
+        { name => $srv, port => $info<port>, status => $status, alive => $alive }
+    }).sort(*<name>).list;
+    @entries;
+}
+
 # Check if a PID is alive
 sub pid-alive(Int() $pid --> Bool) is export {
     "/proc/$pid".IO.d;

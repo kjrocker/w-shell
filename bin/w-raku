@@ -12,6 +12,7 @@ multi MAIN('ls') {
     my $root = find-repo-root();
     my @worktrees = list-worktrees(repo-root => $root);
     my $current-path = $*CWD.Str;
+    my %ports = read-ports($root);
 
     for @worktrees -> %wt {
         my $path = %wt<path>.IO;
@@ -21,6 +22,9 @@ multi MAIN('ls') {
         my $ab = worktree-ahead-behind(path => $path);
         my @cols = $marker, sprintf('%-15s', $name), $dirty;
         @cols.push($ab) if $ab;
+        # Append server status if running
+        my $srv-status = server-status-line($name, %ports);
+        @cols.push($srv-status) if $srv-status;
         say @cols.join('  ');
     }
 }
@@ -41,7 +45,32 @@ multi MAIN('exit') {
 }
 
 multi MAIN('status') {
-    say "TODO: show project dashboard";
+    my $root = find-repo-root();
+    my @worktrees = list-worktrees(repo-root => $root);
+    my $current-path = $*CWD.Str;
+    my %ports = read-ports($root);
+    my $proj = project-name($root);
+
+    say "$proj — {@worktrees.elems} worktree{@worktrees.elems == 1 ?? '' !! 's'}";
+    say '';
+
+    for @worktrees -> %wt {
+        my $path = %wt<path>.IO;
+        my $name = %wt<branch> // (%wt<detached>:exists ?? '(detached)' !! '(unknown)');
+        my $marker = $current-path.starts-with(%wt<path>) ?? '*' !! ' ';
+        my $dirty = worktree-dirty(path => $path) ?? 'dirty' !! 'clean';
+        my $ab = worktree-ahead-behind(path => $path);
+        my @cols = $marker, sprintf('%-15s', $name), $dirty;
+        @cols.push($ab) if $ab;
+        say @cols.join('  ');
+
+        # Show server details
+        my @srv = server-status-block($name, %ports);
+        for @srv.kv -> $i, $s {
+            my $connector = $i == @srv.elems - 1 ?? '└' !! '├';
+            say "              $connector {$s<name>}  :{$s<port>}  ({$s<status>})";
+        }
+    }
 }
 
 multi MAIN('serve', Str $name?, Str :$only) {

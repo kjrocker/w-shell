@@ -106,8 +106,8 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 5b. Port exposure
 
-- [ ] Write `ports.json` on serve, update on stop
-- [ ] Include server status in `w ls` and `w status` output
+- [x] Write `ports.json` on serve, update on stop
+- [x] Include server status in `w ls` and `w status` output
 
 ---
 
