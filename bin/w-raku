@@ -1,5 +1,8 @@
 #!/usr/bin/env raku
 use W::Raku;
+use W::Project;
+use W::Worktree;
+use W::Nav;
 
 multi MAIN('ls') {
     say "TODO: list worktrees";
@@ -29,7 +32,20 @@ multi MAIN(Str $name, *@cmd) {
     if @cmd.elems {
         say "TODO: run '{@cmd.join(' ')}' in worktree $name";
     } else {
-        say "TODO: switch to worktree $name";
+        my $root = find-repo-root();
+        my $path = resolve-worktree-path(
+            parent  => parent-dir($root),
+            project => project-name($root),
+            name    => $name,
+        );
+
+        unless worktree-exists(:$path) {
+            note "Creating worktree $name...";
+            create-worktree(:$name, :$path, :repo-root($root));
+        }
+
+        note "→ $path";
+        write-cd-target($path);
     }
 }
 

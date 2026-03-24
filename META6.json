@@ -5,7 +5,10 @@
     "authors": [],
     "license": "Artistic-2.0",
     "provides": {
-        "W::Raku": "lib/W/Raku.rakumod"
+        "W::Raku": "lib/W/Raku.rakumod",
+        "W::Project": "lib/W/Project.rakumod",
+        "W::Worktree": "lib/W/Worktree.rakumod",
+        "W::Nav": "lib/W/Nav.rakumod"
     },
     "depends": [],
     "build-depends": [],
