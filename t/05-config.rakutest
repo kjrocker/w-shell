@@ -1,0 +1,32 @@
+use Test;
+use W::Config;
+
+plan 3;
+
+# Test: config file present returns expected structure
+{
+    my $tmp = (%*ENV<W_TEST_TMPDIR> // $*TMPDIR).IO.add("w-raku-test-config-{$*PID}");
+    $tmp.mkdir;
+    LEAVE { run 'rm', '-rf', $tmp.Str }
+
+    $tmp.add('.wtconfig.toml').spurt(q:to/END/);
+    path = "{parent}/{project}.worktrees/{name}"
+
+    [setup]
+    commands = ["npm install", "cp .env.example .env"]
+    END
+
+    my %config = load-config($tmp);
+    is %config<path>, '{parent}/{project}.worktrees/{name}', 'path template parsed from config';
+    is-deeply %config<setup><commands>, ["npm install", "cp .env.example .env"], 'setup commands parsed';
+}
+
+# Test: missing config file returns empty hash
+{
+    my $tmp = (%*ENV<W_TEST_TMPDIR> // $*TMPDIR).IO.add("w-raku-test-config-empty-{$*PID}");
+    $tmp.mkdir;
+    LEAVE { run 'rm', '-rf', $tmp.Str }
+
+    my %config = load-config($tmp);
+    is %config.elems, 0, 'missing config file returns empty hash';
+}

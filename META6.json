@@ -8,9 +8,10 @@
         "W::Raku": "lib/W/Raku.rakumod",
         "W::Project": "lib/W/Project.rakumod",
         "W::Worktree": "lib/W/Worktree.rakumod",
-        "W::Nav": "lib/W/Nav.rakumod"
+        "W::Nav": "lib/W/Nav.rakumod",
+        "W::Config": "lib/W/Config.rakumod"
     },
-    "depends": [],
+    "depends": ["TOML::Thumb"],
     "build-depends": [],
     "test-depends": [
         "Test"

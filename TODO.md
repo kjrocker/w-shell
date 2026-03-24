@@ -10,22 +10,22 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 1a. Config module (`lib/W/Config.rakumod`)
 
-- [ ] Add TOML parser dependency (`TOML::Thumb` or similar) to META6.json
-- [ ] Create `W::Config` module exporting:
+- [x] Add TOML parser dependency (`TOML::Thumb` or similar) to META6.json
+- [x] Create `W::Config` module exporting:
   - `load-config(IO::Path $repo-root --> Hash)` — reads `.wtconfig.toml` from repo root, returns parsed hash (or empty hash if file absent)
-- [ ] Test: config file present returns expected structure
-- [ ] Test: missing config file returns empty hash
+- [x] Test: config file present returns expected structure
+- [x] Test: missing config file returns empty hash
 
 ### 1b. Path template interpolation
 
-- [ ] Add `resolve-path-template(Str :$template, Str :$project, Str :$name, IO::Path :$parent, IO::Path :$home --> IO::Path)` to `W::Worktree`
+- [x] Add `resolve-path-template(Str :$template, Str :$project, Str :$name, IO::Path :$parent, IO::Path :$home --> IO::Path)` to `W::Worktree`
   - Interpolates `{project}`, `{name}`, `{parent}`, `{home}` tokens
   - Dies if `{name}` is missing from template
-- [ ] Update `resolve-worktree-path` to accept an optional `:$template` parameter
+- [x] Update `resolve-worktree-path` to accept an optional `:$template` parameter
   - When present, delegates to `resolve-path-template`
   - When absent, uses the current default (`{parent}/{project}.{name}`)
-- [ ] Test: each token interpolates correctly
-- [ ] Test: missing `{name}` in template is an error
+- [x] Test: each token interpolates correctly
+- [x] Test: missing `{name}` in template is an error
 
 ### 1c. Wire config into `w <name>`
 

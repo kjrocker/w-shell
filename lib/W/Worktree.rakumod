@@ -1,7 +1,24 @@
 unit module W::Worktree;
 
-sub resolve-worktree-path(IO::Path :$parent, Str :$project, Str :$name --> IO::Path) is export {
-    $parent.add("{$project}.{$name}");
+sub resolve-path-template(Str :$template, Str :$project, Str :$name,
+                           IO::Path :$parent, IO::Path :$home --> IO::Path) is export {
+    die "Path template must contain \{name}" unless $template.contains('{name}');
+    $template
+        .subst('{project}', $project, :g)
+        .subst('{name}',    $name,    :g)
+        .subst('{parent}',  $parent.Str, :g)
+        .subst('{home}',    $home.Str, :g)
+        .IO;
+}
+
+sub resolve-worktree-path(IO::Path :$parent, Str :$project, Str :$name,
+                           Str :$template, IO::Path :$home --> IO::Path) is export {
+    if $template {
+        resolve-path-template(:$template, :$project, :$name, :$parent,
+                              home => $home // $*HOME);
+    } else {
+        $parent.add("{$project}.{$name}");
+    }
 }
 
 sub worktree-exists(IO::Path :$path --> Bool) is export {
