@@ -1,4 +1,38 @@
 #!/usr/bin/env raku
 use W::Raku;
 
-W::Raku::run(@*ARGS);
+multi MAIN('ls') {
+    say "TODO: list worktrees";
+}
+
+multi MAIN('rm', Str $name, Bool :$force) {
+    say "TODO: remove worktree $name" ~ ($force ?? ' (forced)' !! '');
+}
+
+multi MAIN('exit') {
+    say "TODO: navigate to project root";
+}
+
+multi MAIN('status') {
+    say "TODO: show project dashboard";
+}
+
+multi MAIN('serve', Str $name?, Str :$only) {
+    say "TODO: start servers" ~ ($name ?? " for $name" !! '') ~ ($only ?? " (only $only)" !! '');
+}
+
+multi MAIN('stop', Str $name?) {
+    say "TODO: stop servers" ~ ($name ?? " for $name" !! '');
+}
+
+multi MAIN(Str $name, *@cmd) {
+    if @cmd.elems {
+        say "TODO: run '{@cmd.join(' ')}' in worktree $name";
+    } else {
+        say "TODO: switch to worktree $name";
+    }
+}
+
+multi MAIN(Bool :$version!) {
+    say "w-raku {W::Raku::VERSION}";
+}

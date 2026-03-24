@@ -25,7 +25,7 @@ All user-facing output goes to stdout/stderr normally from Raku.
 
 Create worktree from `main` (if it doesn't exist) and cd into it. On first create, runs setup commands from `.wtconfig.toml` if present.
 
-The worktree is created as a sibling directory: if the main repo is at `~/projects/myapp`, worktree `feat-x` lives at `~/projects/myapp.feat-x`. The branch is named to match.
+The worktree destination is determined by the `path` template in configuration (see [Worktree path template](#worktree-path-template)). Default: sibling directories.
 
 ```
 $ w feat-x
@@ -78,12 +78,12 @@ Done.
 
 Cd back to the main worktree / bare repo root. Useful when you're inside a worktree and want to return.
 
-### `w dash` — project dashboard
+### `w status` — project dashboard
 
 Show all worktrees for the current project with full status: git state, running servers, allocated ports.
 
 ```
-$ w dash
+$ w status
 myapp — 3 worktrees
 
   main        clean   [ahead 2]
@@ -121,6 +121,8 @@ Stopping backend (pid 12346)...
 Optional. Lives in the main worktree / repo root. Without it, `w` does plain worktree create/navigate/remove with no setup or server features.
 
 ```toml
+path = "{parent}/{project}.worktrees/{name}"   # override default layout
+
 [setup]
 commands = ["npm install", "cp .env.example .env"]
 
@@ -139,6 +141,8 @@ base-port = 8080
 
 ### Config fields
 
+**`path`** — worktree directory template (see [Worktree path template](#worktree-path-template)). Optional; defaults to `{parent}/{project}.{name}`.
+
 **`[setup]`**
 - `commands` — list of shell commands run sequentially in the new worktree directory after creation. If any command fails, the worktree is still created but a warning is printed.
 
@@ -147,6 +151,41 @@ base-port = 8080
 - `command` — shell command to start the service
 - `port-env` — environment variable name to pass the assigned port
 - `base-port` — starting port number; actual port = `base-port + slot`
+
+## Worktree path template
+
+The `path` setting controls where worktree directories are created. It supports interpolation of magic strings:
+
+| Token | Expands to | Example |
+|---|---|---|
+| `{project}` | Name of the main repo directory | `myapp` |
+| `{name}` | Worktree / branch name | `feat-x` |
+| `{parent}` | Parent directory of the main repo | `/home/kevin/projects` |
+| `{home}` | User's home directory | `/home/kevin` |
+
+### Common patterns
+
+**Sibling directories** (default):
+```toml
+path = "{parent}/{project}.{name}"
+# ~/projects/myapp.feat-x
+```
+
+**Subdirectory of project**:
+```toml
+path = "{parent}/{project}.worktrees/{name}"
+# ~/projects/myapp.worktrees/feat-x
+```
+
+**Dedicated global worktree directory**:
+```toml
+path = "{home}/worktrees/{project}/{name}"
+# ~/worktrees/myapp/feat-x
+```
+
+The default (when no config exists) is `{parent}/{project}.{name}`.
+
+Intermediate directories are created automatically. The template must include `{name}` — it is an error to omit it.
 
 ## Port allocation
 
@@ -184,10 +223,10 @@ Ports are passed to server commands via the env var specified in `port-env`. Add
 w-raku/
 ├── bin/w-raku                    # Entry point (#!/usr/bin/env raku)
 ├── lib/W/
-│   ├── Worktree.rakumod          # Worktree class
-│   ├── Project.rakumod           # Project class (discovers repo root, manages worktrees)
+│   ├── Worktree.rakumod          # Worktree operations (create, remove, list, resolve path)
+│   ├── Project.rakumod           # Project discovery (find repo root, read config)
 │   ├── Server.rakumod            # Server process management (Proc::Async)
-│   ├── Config.rakumod            # .wtconfig.toml parsing
+│   ├── Config.rakumod            # .wtconfig.toml + global config parsing/merging
 │   ├── Slots.rakumod             # Port slot allocation + persistence
 │   └── Git/Porcelain.rakumod     # Grammar for git worktree list --porcelain
 ├── completions/_w                # Zsh completions
@@ -201,7 +240,7 @@ w-raku/
 |---|---|
 | Multi-dispatch `MAIN` | Subcommand routing |
 | Grammars + Actions | Parsing `git worktree list --porcelain` |
-| OOP (classes, roles) | `W::Project`, `W::Worktree`, `W::Server` |
+| Functional modules (exported subs) | All `lib/W/` modules |
 | `Proc::Async` | Server process management |
 | Module system | `lib/` structure with `META6.json` |
 | TOML module | Config parsing |
@@ -209,7 +248,7 @@ w-raku/
 ## Implementation phases
 
 1. **Core ops** — scaffold repo, worktree create/navigate/list/remove/exit, grammar for `git worktree list --porcelain`, zsh wrapper + completions.
-2. **Config + setup** — `.wtconfig.toml` parsing, run setup commands on worktree creation, slot allocation + persistence.
+2. **Config + setup** — `.wtconfig.toml` + global config parsing, path template interpolation, run setup commands on worktree creation, slot allocation + persistence.
 3. **Server management** — `serve`/`stop` subcommands, `Proc::Async`, PID tracking, port exposure to env vars and state files.
 4. **Dashboard + polish** — `w dash`, `w ls` server status, formatted terminal output.
 
