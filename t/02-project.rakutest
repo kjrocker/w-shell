@@ -1,7 +1,7 @@
 use Test;
 use W::Project;
 
-plan 4;
+plan 5;
 
 # Pure functions — no git needed
 {
@@ -32,4 +32,8 @@ plan 4;
 
     # project-name of discovered root
     is project-name($found), $tmp.basename, 'project-name works on discovered root';
+
+    # find-main-worktree returns the main worktree (same as root for non-linked worktrees)
+    my $main = find-main-worktree();
+    is $main.resolve.Str, $tmp.resolve.Str, 'find-main-worktree returns main worktree path';
 }

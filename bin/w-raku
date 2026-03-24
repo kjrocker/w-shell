@@ -13,7 +13,9 @@ multi MAIN('rm', Str $name, Bool :$force) {
 }
 
 multi MAIN('exit') {
-    say "TODO: navigate to project root";
+    my $main = find-main-worktree();
+    note "→ $main";
+    write-cd-target($main);
 }
 
 multi MAIN('status') {
