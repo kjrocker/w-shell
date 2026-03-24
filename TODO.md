@@ -49,9 +49,9 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 2b. Wire setup into `w <name>` on first create
 
-- [ ] After `create-worktree` succeeds, check config for `setup.commands`
-- [ ] If present and this is a new worktree (not an existing navigate), call `run-setup`
-- [ ] Verify end-to-end: creating a new worktree with setup commands in config runs them
+- [x] After `create-worktree` succeeds, check config for `setup.commands`
+- [x] If present and this is a new worktree (not an existing navigate), call `run-setup`
+- [x] Verify end-to-end: creating a new worktree with setup commands in config runs them
 
 ---
 

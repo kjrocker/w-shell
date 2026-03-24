@@ -4,6 +4,7 @@ use W::Project;
 use W::Worktree;
 use W::Config;
 use W::Nav;
+use W::Setup;
 
 multi MAIN('ls') {
     say "TODO: list worktrees";
@@ -44,9 +45,15 @@ multi MAIN(Str $name, *@cmd) {
             template => %config<path> // Str,
         );
 
-        unless worktree-exists(:$path) {
+        my $is-new = !worktree-exists(:$path);
+        if $is-new {
             note "Creating worktree $name...";
             create-worktree(:$name, :$path, :repo-root($root));
+
+            my @setup-cmds = |(%config<setup><commands> // []);
+            if @setup-cmds {
+                run-setup(worktree-path => $path, commands => @setup-cmds);
+            }
         }
 
         note "→ $path";
