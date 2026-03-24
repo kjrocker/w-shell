@@ -2,14 +2,11 @@
 use W::Raku;
 use W::Project;
 use W::Worktree;
-use W::Config;
-use W::Nav;
-use W::Setup;
-use W::Slots;
-use W::Server;
-use W::Display;
 
 multi MAIN('ls') {
+    require W::Display <&bold-green &bold &format-status &format-ahead-behind &format-server-status>;
+    require W::Server <&read-ports &server-status-line>;
+
     my $root = find-repo-root();
     my @worktrees = list-worktrees(repo-root => $root);
     my $current-path = $*CWD.Str;
@@ -35,6 +32,9 @@ multi MAIN('ls') {
 }
 
 multi MAIN('rm', Str $name, Bool :$force) {
+    require W::Server <&stop-servers>;
+    require W::Slots <&free-slot>;
+
     my $root = find-repo-root();
     stop-servers(:$name, repo-root => $root);
     note "Removing worktree $name...";
@@ -44,12 +44,17 @@ multi MAIN('rm', Str $name, Bool :$force) {
 }
 
 multi MAIN('exit') {
+    require W::Nav <&write-cd-target>;
+
     my $main = find-main-worktree();
     note "→ $main";
     write-cd-target($main);
 }
 
 multi MAIN('status') {
+    require W::Display <&bold &bold-green &green &red &cyan &format-status &format-ahead-behind>;
+    require W::Server <&read-ports &server-status-block>;
+
     my $root = find-repo-root();
     my @worktrees = list-worktrees(repo-root => $root);
     my $current-path = $*CWD.Str;
@@ -84,10 +89,12 @@ multi MAIN('status') {
 }
 
 multi MAIN('serve', Str $name?, Str :$only) {
+    require W::Config <&load-config>;
+    require W::Server <&start-servers>;
+
     my $root = find-repo-root();
     my %config = load-config($root);
     my $wt-name = $name // do {
-        # Determine current worktree name from cwd
         my @wts = list-worktrees(repo-root => $root);
         my $cwd = $*CWD.Str;
         my $current = @wts.first({ $cwd.starts-with(.<path>) });
@@ -97,6 +104,8 @@ multi MAIN('serve', Str $name?, Str :$only) {
 }
 
 multi MAIN('stop', Str $name?) {
+    require W::Server <&stop-servers>;
+
     my $root = find-repo-root();
     my $wt-name = $name // do {
         my @wts = list-worktrees(repo-root => $root);
@@ -108,6 +117,9 @@ multi MAIN('stop', Str $name?) {
 }
 
 multi MAIN(Str $name, *@cmd) {
+    require W::Config <&load-config>;
+    require W::Nav <&write-cd-target>;
+
     if @cmd.elems {
         my $root = find-repo-root();
         my %config = load-config($root);
@@ -132,6 +144,9 @@ multi MAIN(Str $name, *@cmd) {
 
         my $is-new = !worktree-exists(:$path);
         if $is-new {
+            require W::Slots <&assign-slot>;
+            require W::Setup <&run-setup>;
+
             note "Creating worktree $name...";
             create-worktree(:$name, :$path, :repo-root($root));
             assign-slot(:$name, repo-root => $root);

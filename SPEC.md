@@ -220,42 +220,27 @@ Ports are passed to server commands via the env var specified in `port-env`. Add
 
 ```
 w-raku/
-├── bin/w-raku                    # Entry point (#!/usr/bin/env raku)
-├── lib/W/
-│   ├── Worktree.rakumod          # Worktree operations (create, remove, list, resolve path)
-│   ├── Project.rakumod           # Project discovery (find repo root, read config)
-│   ├── Server.rakumod            # Server process management (Proc::Async)
-│   ├── Config.rakumod            # .wtconfig.toml + global config parsing/merging
-│   ├── Slots.rakumod             # Port slot allocation + persistence
-│   └── Git/Porcelain.rakumod     # Grammar for git worktree list --porcelain
+├── bin/w                         # Entry point (#!/usr/bin/env bash)
+├── shell/
+│   ├── w.zsh                     # Zsh wrapper (sources bin/w, handles cd-target)
+│   └── w.bash                    # Bash wrapper
 ├── completions/_w                # Zsh completions
-├── t/                            # Tests
-└── META6.json
+├── t/                            # Tests (bats)
+├── lib/W/                        # Legacy Raku implementation (reference)
+└── bin/w-raku                    # Legacy Raku entry point (reference)
 ```
 
-## Raku features exercised
+## Parsing
 
-| Feature | Where |
-|---|---|
-| Multi-dispatch `MAIN` | Subcommand routing |
-| Grammars + Actions | Parsing `git worktree list --porcelain` |
-| Functional modules (exported subs) | All `lib/W/` modules |
-| `Proc::Async` | Server process management |
-| Module system | `lib/` structure with `META6.json` |
-| TOML module | Config parsing |
-
-## Implementation phases
-
-1. **Core ops** — scaffold repo, worktree create/navigate/list/remove/exit, grammar for `git worktree list --porcelain`, zsh wrapper + completions.
-2. **Config + setup** — `.wtconfig.toml` + global config parsing, path template interpolation, run setup commands on worktree creation, slot allocation + persistence.
-3. **Server management** — `serve`/`stop` subcommands, `Proc::Async`, PID tracking, port exposure to env vars and state files.
-4. **Dashboard + polish** — `w dash`, `w ls` server status, formatted terminal output.
+- **Git porcelain** — `git worktree list --porcelain` is parsed with `awk`. The format is line-oriented key-value pairs separated by blank lines — no grammar needed.
+- **TOML config** — `.wtconfig.toml` is parsed with `yq` ([mikefarah/yq](https://github.com/mikefarah/yq), Go binary). Reads TOML natively: `yq -oy '.path' .wtconfig.toml`.
+- **JSON state** — `slots.json` and `ports.json` are read/written with `jq`.
 
 ## Dependencies
 
-- Raku v2026.01+ (rakubrew)
-- Phase 1: no external modules
-- Phase 2+: TOML parser (`zef install TOML::Thumb` or similar)
+- `jq` — JSON read/write for state files
+- `yq` — TOML parsing for .wtconfig.toml ([mikefarah/yq](https://github.com/mikefarah/yq))
+- `bats-core` — test framework
 
 ## Runtime state
 

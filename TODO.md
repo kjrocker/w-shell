@@ -1,118 +1,95 @@
-# TODO — Implementation Plan
+# Shell migration TODO
 
-## Current state
+Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands as separate shell functions. Dependencies: `jq`, `yq` (mikefarah/yq, Go binary). Test with `bats`.
 
-Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navigates, `w exit` works, other subcommands are stubs. No config parsing, setup orchestration, or server management exists yet.
+## 1. Scaffold and core infrastructure
 
----
+- [ ] Create `bin/w` with: shebang, `set -euo pipefail`, state dir constant (`~/.local/state/w`), project discovery functions:
+  - `_w_find_root` — prints `git rev-parse --show-toplevel`, dies if not in a repo
+  - `_w_project_name root` — prints basename of repo root
+  - `_w_parent_dir root` — prints dirname of repo root
+  - `_w_find_main_worktree` — prints path of first worktree from `git worktree list`
+- [ ] Add `_w_cd_target path` — writes `path` to `$STATE_DIR/cd-target`, creating parent dirs via `mkdir -p`
+- [ ] Add color helpers respecting `NO_COLOR` env and `[ -t 1 ]` TTY check:
+  - `_w_color code text` — wraps text in ANSI escape if color enabled, no-op otherwise
+  - `_w_bold`, `_w_green`, `_w_red`, `_w_yellow`, `_w_cyan`, `_w_dim`, `_w_bold_green` — each calls `_w_color` with the appropriate code(s)
+- [ ] Add main router — `case "$1"` at bottom of file dispatching `ls|rm|exit|status|serve|stop|--version|--help` to `_w_cmd_*` functions, default case calls `_w_cmd_go`
+- [ ] Add `shell/w.zsh` — sourceable wrapper: calls `bin/w "$@"`, then if `$STATE_DIR/cd-target` exists, reads it into `cd`, deletes the file
+- [ ] Set up bats scaffolding: `t/helpers.bash` with `setup()` that creates a temp git repo (init + initial commit), `teardown()` that cleans up; first test file `t/01-core.bats` verifying `_w_find_root` returns the temp repo path
+- [ ] Tests pass, `bin/w --version` prints version string
 
-## 1. Extend `w <name>` with configuration
+## 2. Worktree list and porcelain parsing
 
-### 1a. Config module (`lib/W/Config.rakumod`)
+- [ ] `_w_parse_worktrees root` — runs `git -C "$root" worktree list --porcelain`, pipes through awk to emit one tab-delimited line per worktree: `path\tbranch\tsha\tbare|detached|normal`; branch has `refs/heads/` stripped
+- [ ] `_w_worktree_dirty path` — exits 0 if `git -C "$path" status --porcelain` produces output, 1 otherwise
+- [ ] `_w_worktree_dirty_count path` — prints number of lines from `git -C "$path" status --porcelain` (0 if clean)
+- [ ] `_w_worktree_ahead_behind path` — runs `git -C "$path" rev-list --left-right --count HEAD...@{upstream}`, prints `[ahead N, behind M]` (omitting zero components), empty string if no upstream
+- [ ] Tests: feed canned porcelain strings to the awk parser, assert field extraction; create temp repo with staged+unstaged changes, verify dirty/count/ahead-behind
+- [ ] Tests pass
 
-- [x] Add TOML parser dependency (`TOML::Thumb` or similar) to META6.json
-- [x] Create `W::Config` module exporting:
-  - `load-config(IO::Path $repo-root --> Hash)` — reads `.wtconfig.toml` from repo root, returns parsed hash (or empty hash if file absent)
-- [x] Test: config file present returns expected structure
-- [x] Test: missing config file returns empty hash
+## 3. Config parsing (TOML)
 
-### 1b. Path template interpolation
+- [ ] `_w_config_file root` — prints path to `$root/.wtconfig.toml`, returns 1 if missing
+- [ ] `_w_config_get root query` — runs `yq -oy "$query" "$root/.wtconfig.toml"`, returns empty/1 if file missing; query is a yq path like `.path`, `.setup.commands[]`, `.server[].name`
+- [ ] `_w_resolve_path root name` — reads path template from config (or uses default `{parent}/{project}.{name}`), performs `${template//\{project\}/$project}` substitutions for `{project}`, `{name}`, `{parent}`, `{home}`, prints resolved absolute path
+- [ ] Tests: verify template expansion for sibling (`{parent}/{project}.{name}`), subdirectory (`{parent}/{project}.worktrees/{name}`), and global (`{home}/worktrees/{project}/{name}`) patterns; verify missing config returns default path
+- [ ] Tests pass
 
-- [x] Add `resolve-path-template(Str :$template, Str :$project, Str :$name, IO::Path :$parent, IO::Path :$home --> IO::Path)` to `W::Worktree`
-  - Interpolates `{project}`, `{name}`, `{parent}`, `{home}` tokens
-  - Dies if `{name}` is missing from template
-- [x] Update `resolve-worktree-path` to accept an optional `:$template` parameter
-  - When present, delegates to `resolve-path-template`
-  - When absent, uses the current default (`{parent}/{project}.{name}`)
-- [x] Test: each token interpolates correctly
-- [x] Test: missing `{name}` in template is an error
+## 4. Slot allocation
 
-### 1c. Wire config into `w <name>`
+- [ ] `_w_project_id root` — prints repo root with `/` replaced by `_` and leading `_` stripped (filesystem-safe identifier)
+- [ ] `_w_state_dir root` — prints `$STATE_DIR/projects/$(_w_project_id "$root")`, runs `mkdir -p` on it
+- [ ] `_w_slot_assign name root` — reads `slots.json` via jq, if name already assigned prints existing slot, otherwise finds lowest int >= 1 not in `.[]` values, writes updated JSON, prints assigned slot
+- [ ] `_w_slot_free name root` — deletes key `name` from `slots.json` via `jq 'del(.[$name])'`, writes back
+- [ ] `_w_slot_get name root` — prints 0 if name is "main", otherwise prints slot from `slots.json` (empty if unassigned)
+- [ ] Tests: assign slots to a, b, c (expect 1,2,3), free b, assign d (expect reuses 2), get main returns 0
+- [ ] Tests pass
 
-- [x] In `bin/w-raku`, load config via `load-config($root)` in the `MAIN(Str $name)` candidate
-- [x] Pass the `path` template (if present in config) through to `resolve-worktree-path`
-- [x] Verify end-to-end: config with custom `path` template produces correct worktree location
+## 5. Subcommands: exit, version, navigate/create
 
----
+- [ ] `_w_cmd_version` — prints `w <VERSION>` to stdout
+- [ ] `_w_cmd_exit` — calls `_w_find_main_worktree`, writes result to cd-target via `_w_cd_target`
+- [ ] `_w_cmd_go name` — calls `_w_resolve_path` for name; if path exists and has `.git`, writes cd-target; otherwise calls `_w_create_worktree` + `_w_slot_assign` + `_w_run_setup`, then writes cd-target
+- [ ] `_w_create_worktree name path root` — runs `git -C "$root" worktree add -b "$name" "$path" main`; on "already exists" error retries with `git worktree add "$path" "$name"`, dies on other errors
+- [ ] `_w_run_setup path root` — reads `_w_config_get "$root" '.setup.commands[]'`, runs each line with `(cd "$path" && eval "$cmd")`, prints warning to stderr on non-zero exit, continues
+- [ ] `_w_cmd_run name cmd...` — resolves path, dies if worktree doesn't exist, runs `(cd "$path" && eval "$@")`, exits with command's exit code
+- [ ] Tests: exit writes main worktree to cd-target; go to existing worktree writes cd-target; go to new name creates worktree + slot; run echoes from correct directory
+- [ ] Tests pass
 
-## 2. Setup command orchestration
+## 6. Subcommands: ls, status
 
-### 2a. Setup runner (`lib/W/Setup.rakumod`)
+- [ ] `_w_cmd_ls` — for each worktree from `_w_parse_worktrees`: prints `marker  name  status  [ahead/behind]  [server]` where marker is `*` (bold green) if cwd is inside that worktree, name is left-padded to 15 chars
+- [ ] `_w_cmd_status` — prints bold project name + worktree count header, then per worktree same as ls, plus `_w_server_status_block` lines indented with `├`/`└` tree connectors
+- [ ] `_w_format_status dirty count` — prints yellow `dirty  N files changed` or green `clean`
+- [ ] `_w_server_status_line name root` — reads ports.json via jq, for each server where `/proc/$pid` exists collects `:port`, prints `● server running :3001,:8081` or empty
+- [ ] `_w_server_status_block name root` — reads ports.json, prints one line per server: `name  :port  (pid N)` or `(stopped)`, with green/red coloring on status
+- [ ] Tests: create temp ports.json with known PIDs (use `$$` for alive, 999999 for dead), verify status line/block output; verify ls column alignment with mocked worktree data
+- [ ] Tests pass
 
-- [x] Create `W::Setup` module exporting:
-  - `run-setup(IO::Path :$worktree-path, :@commands)` — runs each command sequentially via shell in the worktree directory
-  - Prints `Running setup: <cmd>` to stderr for each command
-  - On command failure: prints warning to stderr, continues (worktree already created)
-  - Returns a list of results (exit codes) for testability
-- [x] Test: commands run in specified directory
-- [x] Test: failing command prints warning but does not die
+## 7. Subcommands: serve, stop, rm
 
-### 2b. Wire setup into `w <name>` on first create
+- [ ] `_w_ports_file root` — prints `$(_w_state_dir "$root")/ports.json`
+- [ ] `_w_read_ports root` — cats ports.json if it exists, otherwise prints `{}`
+- [ ] `_w_write_ports root json` — writes json string to ports.json
+- [ ] `_w_cmd_serve [name] [--only=srv]` — for each `[[server]]` in config (filtered by `--only`): computes `port = base-port + slot`, starts `sh -c "$command"` in background with `$port_env=$port`, captures `$!` as PID, updates ports.json with slot/port/pid per server
+- [ ] `_w_cmd_stop [name] [--only=srv]` — reads ports.json, for each server (filtered by `--only`): sends SIGTERM, sleeps 0.2s, sends SIGKILL if `/proc/$pid` still exists; removes entry from ports.json (removes whole worktree key if no servers remain)
+- [ ] `_w_cmd_rm name [--force]` — calls `_w_cmd_stop "$name"`, then unless `--force` checks `git log --oneline main..$name` for unmerged commits (dies if any), runs `git worktree remove`, calls `_w_slot_free`
+- [ ] Tests: serve starts a `sleep 600` background process, verify PID appears in ports.json and `/proc/$pid` exists; stop kills it, verify PID gone and ports.json cleaned; rm on branch with unmerged commit dies without `--force`, succeeds with `--force`
+- [ ] Tests pass
 
-- [x] After `create-worktree` succeeds, check config for `setup.commands`
-- [x] If present and this is a new worktree (not an existing navigate), call `run-setup`
-- [x] Verify end-to-end: creating a new worktree with setup commands in config runs them
+## 8. Shell integration and completions
 
----
+- [ ] Port `completions/_w` to work with `bin/w` — dynamic worktree name completion from `git worktree list`, subcommand completion, `--force`/`--only` flag completion
+- [ ] Update `shell/w.zsh` wrapper to handle: no cd-target file, non-zero exit from `bin/w` (don't cd), clean up stale cd-target on wrapper source
+- [ ] Add `shell/w.bash` — bash equivalent of the zsh wrapper + basic `complete -F` completions
+- [ ] End-to-end test: source wrapper in a subshell, run `w <name>`, verify `$PWD` changed
+- [ ] Tests pass
 
-## 3. Complete remaining Phase 1 subcommands
+## 9. Cleanup
 
-### 3a. `w ls` — list worktrees
-
-- [x] Create `W::Git::Porcelain` grammar + actions to parse `git worktree list --porcelain` output
-- [x] Implement `list-worktrees` in `W::Worktree` using the grammar
-- [x] Wire into `MAIN('ls')` — format output as: name, clean/dirty, ahead/behind
-- [x] Tests for grammar parsing various porcelain outputs
-
-### 3b. `w rm <name>` — remove worktree
-
-- [x] Implement `remove-worktree(Str :$name, IO::Path :$repo-root, Bool :$force)` in `W::Worktree`
-  - Refuses if branch has unmerged commits (unless `--force`)
-  - Runs `git worktree remove`
-- [x] Wire into `MAIN('rm', ...)`
-- [x] Tests for remove (normal case, unmerged refuse, force override)
-
-### 3c. `w <name> <cmd...>` — run in worktree
-
-- [x] Implement in `MAIN(Str $name, *@cmd)`: resolve worktree path, run command via shell in that directory
-- [x] Pass through exit code
-
----
-
-## 4. Slot allocation (`lib/W/Slots.rakumod`)
-
-- [x] Create state directory structure: `~/.local/state/w/projects/<project-id>/`
-- [x] Derive `project-id` from repo root path (sanitized or hashed)
-- [x] Implement `assign-slot` / `free-slot` / `get-slot` operating on `slots.json`
-  - Main worktree is always slot 0
-  - New worktrees get lowest available slot
-- [x] Assign slot on worktree creation, free on removal
-- [x] Tests for slot assignment, reuse of freed slots
-
----
-
-## 5. Server management
-
-### 5a. Serve/stop (`lib/W/Server.rakumod`)
-
-- [x] Implement `start-servers` using `Proc::Async`
-  - Read `[[server]]` entries from config
-  - Compute port as `base-port + slot`
-  - Set env var (`port-env`) for each server process
-  - Track PIDs in `ports.json`
-- [x] Implement `stop-servers` — signal tracked PIDs, clean up state
-- [x] Wire into `MAIN('serve', ...)` and `MAIN('stop', ...)`
-- [x] `w rm` stops servers before removing
-
-### 5b. Port exposure
-
-- [x] Write `ports.json` on serve, update on stop
-- [x] Include server status in `w ls` and `w status` output
-
----
-
-## 6. Dashboard and polish
-
-- [x] `w status` — full project dashboard (worktrees + servers + ports)
-- [x] Formatted terminal output (colors, alignment)
-- [x] Zsh completions (`completions/_w`)
+- [ ] Run full bats suite, fix any failures
+- [ ] Side-by-side verify: run each subcommand in both Raku and shell versions, confirm matching output
+- [ ] Update CLAUDE.md: replace raku build/run/test instructions with `bats t/`, note `jq`+`tomlq` deps
+- [ ] Update SPEC.md: repo layout, remove Raku feature table, update dependency list
+- [ ] Remove MIGRATION.md
+- [ ] Remove Raku source: `lib/`, `META6.json`, `bin/w-raku` (preserved in git history)
