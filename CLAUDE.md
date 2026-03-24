@@ -21,3 +21,4 @@ raku -Ilib t/01-basic.rakutest
 - Use multi-dispatch subs for subcommand routing and polymorphic behavior.
 - Grammars are fine — they're a Raku strength and inherently declarative.
 - Write tests for any top-level export or non-trivial logic
+- Commit incrementally, use quick and terse commit messages

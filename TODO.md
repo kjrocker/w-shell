@@ -1,0 +1,118 @@
+# TODO — Implementation Plan
+
+## Current state
+
+Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navigates, `w exit` works, other subcommands are stubs. No config parsing, setup orchestration, or server management exists yet.
+
+---
+
+## 1. Extend `w <name>` with configuration
+
+### 1a. Config module (`lib/W/Config.rakumod`)
+
+- [ ] Add TOML parser dependency (`TOML::Thumb` or similar) to META6.json
+- [ ] Create `W::Config` module exporting:
+  - `load-config(IO::Path $repo-root --> Hash)` — reads `.wtconfig.toml` from repo root, returns parsed hash (or empty hash if file absent)
+- [ ] Test: config file present returns expected structure
+- [ ] Test: missing config file returns empty hash
+
+### 1b. Path template interpolation
+
+- [ ] Add `resolve-path-template(Str :$template, Str :$project, Str :$name, IO::Path :$parent, IO::Path :$home --> IO::Path)` to `W::Worktree`
+  - Interpolates `{project}`, `{name}`, `{parent}`, `{home}` tokens
+  - Dies if `{name}` is missing from template
+- [ ] Update `resolve-worktree-path` to accept an optional `:$template` parameter
+  - When present, delegates to `resolve-path-template`
+  - When absent, uses the current default (`{parent}/{project}.{name}`)
+- [ ] Test: each token interpolates correctly
+- [ ] Test: missing `{name}` in template is an error
+
+### 1c. Wire config into `w <name>`
+
+- [ ] In `bin/w-raku`, load config via `load-config($root)` in the `MAIN(Str $name)` candidate
+- [ ] Pass the `path` template (if present in config) through to `resolve-worktree-path`
+- [ ] Verify end-to-end: config with custom `path` template produces correct worktree location
+
+---
+
+## 2. Setup command orchestration
+
+### 2a. Setup runner (`lib/W/Setup.rakumod`)
+
+- [ ] Create `W::Setup` module exporting:
+  - `run-setup(IO::Path :$worktree-path, :@commands)` — runs each command sequentially via shell in the worktree directory
+  - Prints `Running setup: <cmd>` to stderr for each command
+  - On command failure: prints warning to stderr, continues (worktree already created)
+  - Returns a list of results (exit codes) for testability
+- [ ] Test: commands run in specified directory
+- [ ] Test: failing command prints warning but does not die
+
+### 2b. Wire setup into `w <name>` on first create
+
+- [ ] After `create-worktree` succeeds, check config for `setup.commands`
+- [ ] If present and this is a new worktree (not an existing navigate), call `run-setup`
+- [ ] Verify end-to-end: creating a new worktree with setup commands in config runs them
+
+---
+
+## 3. Complete remaining Phase 1 subcommands
+
+### 3a. `w ls` — list worktrees
+
+- [ ] Create `W::Git::Porcelain` grammar + actions to parse `git worktree list --porcelain` output
+- [ ] Implement `list-worktrees` in `W::Worktree` using the grammar
+- [ ] Wire into `MAIN('ls')` — format output as: name, clean/dirty, ahead/behind
+- [ ] Tests for grammar parsing various porcelain outputs
+
+### 3b. `w rm <name>` — remove worktree
+
+- [ ] Implement `remove-worktree(Str :$name, IO::Path :$repo-root, Bool :$force)` in `W::Worktree`
+  - Refuses if branch has unmerged commits (unless `--force`)
+  - Runs `git worktree remove`
+- [ ] Wire into `MAIN('rm', ...)`
+- [ ] Tests for remove (normal case, unmerged refuse, force override)
+
+### 3c. `w <name> <cmd...>` — run in worktree
+
+- [ ] Implement in `MAIN(Str $name, *@cmd)`: resolve worktree path, run command via shell in that directory
+- [ ] Pass through exit code
+
+---
+
+## 4. Slot allocation (`lib/W/Slots.rakumod`)
+
+- [ ] Create state directory structure: `~/.local/state/w/projects/<project-id>/`
+- [ ] Derive `project-id` from repo root path (sanitized or hashed)
+- [ ] Implement `assign-slot` / `free-slot` / `get-slot` operating on `slots.json`
+  - Main worktree is always slot 0
+  - New worktrees get lowest available slot
+- [ ] Assign slot on worktree creation, free on removal
+- [ ] Tests for slot assignment, reuse of freed slots
+
+---
+
+## 5. Server management
+
+### 5a. Serve/stop (`lib/W/Server.rakumod`)
+
+- [ ] Implement `start-servers` using `Proc::Async`
+  - Read `[[server]]` entries from config
+  - Compute port as `base-port + slot`
+  - Set env var (`port-env`) for each server process
+  - Track PIDs in `ports.json`
+- [ ] Implement `stop-servers` — signal tracked PIDs, clean up state
+- [ ] Wire into `MAIN('serve', ...)` and `MAIN('stop', ...)`
+- [ ] `w rm` stops servers before removing
+
+### 5b. Port exposure
+
+- [ ] Write `ports.json` on serve, update on stop
+- [ ] Include server status in `w ls` and `w status` output
+
+---
+
+## 6. Dashboard and polish
+
+- [ ] `w status` — full project dashboard (worktrees + servers + ports)
+- [ ] Formatted terminal output (colors, alignment)
+- [ ] Zsh completions (`completions/_w`)

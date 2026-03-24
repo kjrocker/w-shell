@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# claude-container — run Claude Code CLI in an isolated container
+# Usage: ./claude-container [claude args...]
+#
+# Requires: docker or podman
+# Env: ANTHROPIC_API_KEY must be set (or will be read from ~/.claude/)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMAGE_NAME="claude-sandboxed"
+CONTAINER_RUNTIME=""
+
+# Detect container runtime
+if command -v podman &>/dev/null; then
+    CONTAINER_RUNTIME="podman"
+elif command -v docker &>/dev/null; then
+    CONTAINER_RUNTIME="docker"
+else
+    echo "Error: neither podman nor docker found" >&2
+    exit 1
+fi
+
+# Build image if it doesn't exist (or if Containerfile is newer)
+build_image() {
+    local needs_build=false
+
+    if ! $CONTAINER_RUNTIME image exists "$IMAGE_NAME" 2>/dev/null; then
+        needs_build=true
+    elif [ "$SCRIPT_DIR/Containerfile" -nt "$(date -r "$($CONTAINER_RUNTIME image inspect "$IMAGE_NAME" --format '{{.Created}}' 2>/dev/null || echo 0)" 2>/dev/null)" ]; then
+        needs_build=true
+    fi
+
+    if $needs_build; then
+        echo "Building $IMAGE_NAME..." >&2
+        $CONTAINER_RUNTIME build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Containerfile" "$SCRIPT_DIR"
+    fi
+}
+
+build_image
+
+# Assemble run args
+RUN_ARGS=(
+    run --rm
+    --name "claude-session-$$"
+    # Mount the working directory (or current dir) as /workspace
+    -v "${CLAUDE_WORKSPACE:-$(pwd)}:/workspace:z"
+    # Pass API key if set
+    ${ANTHROPIC_API_KEY:+-e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"}
+    # Pass through claude config for auth (read-only)
+    -v "${HOME}/.claude/settings.json:/home/claude/.claude/settings.json:ro,z"
+)
+
+# Mount credentials file if it exists (for OAuth-based auth)
+if [ -f "${HOME}/.claude/.credentials.json" ]; then
+    RUN_ARGS+=(-v "${HOME}/.claude/.credentials.json:/home/claude/.claude/.credentials.json:ro,z")
+fi
+
+# Optional: limit resources
+RUN_ARGS+=(
+    --memory=4g
+    --cpus=2
+)
+
+# Add TTY flags if interactive
+if [ -t 0 ] && [ -t 1 ]; then
+    RUN_ARGS+=(-it)
+else
+    RUN_ARGS+=(-i)
+fi
+
+# Run it
+exec $CONTAINER_RUNTIME "${RUN_ARGS[@]}" "$IMAGE_NAME" "$@"
