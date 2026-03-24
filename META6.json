@@ -9,7 +9,8 @@
         "W::Project": "lib/W/Project.rakumod",
         "W::Worktree": "lib/W/Worktree.rakumod",
         "W::Nav": "lib/W/Nav.rakumod",
-        "W::Config": "lib/W/Config.rakumod"
+        "W::Config": "lib/W/Config.rakumod",
+        "W::Setup": "lib/W/Setup.rakumod"
     },
     "depends": ["TOML::Thumb"],
     "build-depends": [],

@@ -1,0 +1,36 @@
+use Test;
+use W::Setup;
+
+plan 4;
+
+# Test: commands run in specified directory
+{
+    my $dir = $*TMPDIR.add("w-test-setup-{$*PID}");
+    $dir.mkdir;
+    LEAVE { $dir.IO.dir.map(*.unlink); $dir.rmdir }
+
+    my @results = run-setup(
+        worktree-path => $dir,
+        commands => ['touch marker.txt'],
+    );
+
+    ok $dir.add('marker.txt').e, 'command runs in specified directory';
+    is @results[0], 0, 'successful command returns exit code 0';
+}
+
+# Test: failing command prints warning but does not die
+{
+    my $dir = $*TMPDIR.add("w-test-setup-fail-{$*PID}");
+    $dir.mkdir;
+    LEAVE { $dir.IO.dir.map(*.unlink); $dir.rmdir }
+
+    my @results;
+    lives-ok {
+        @results = run-setup(
+            worktree-path => $dir,
+            commands => ['false', 'touch after-fail.txt'],
+        );
+    }, 'failing command does not die';
+
+    isnt @results[0], 0, 'failing command returns non-zero exit code';
+}

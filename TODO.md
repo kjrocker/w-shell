@@ -39,13 +39,13 @@ Phase 1 (core ops) is partially complete: `w <name>` creates worktrees and navig
 
 ### 2a. Setup runner (`lib/W/Setup.rakumod`)
 
-- [ ] Create `W::Setup` module exporting:
+- [x] Create `W::Setup` module exporting:
   - `run-setup(IO::Path :$worktree-path, :@commands)` — runs each command sequentially via shell in the worktree directory
   - Prints `Running setup: <cmd>` to stderr for each command
   - On command failure: prints warning to stderr, continues (worktree already created)
   - Returns a list of results (exit codes) for testability
-- [ ] Test: commands run in specified directory
-- [ ] Test: failing command prints warning but does not die
+- [x] Test: commands run in specified directory
+- [x] Test: failing command prints warning but does not die
 
 ### 2b. Wire setup into `w <name>` on first create
 
