@@ -114,6 +114,40 @@ _w_worktree_ahead_behind() {
   fi
 }
 
+# --- Config parsing ---
+
+_w_config_file() {
+  local root="$1"
+  local cfg="$root/.wtconfig.toml"
+  if [[ -f "$cfg" ]]; then
+    printf '%s' "$cfg"
+  else
+    return 1
+  fi
+}
+
+_w_config_get() {
+  local root="$1" query="$2"
+  local cfg
+  cfg="$(_w_config_file "$root")" || return 1
+  tomlq -r "$query" "$cfg"
+}
+
+_w_resolve_path() {
+  local root="$1" name="$2"
+  local project parent template
+  project="$(_w_project_name "$root")"
+  parent="$(_w_parent_dir "$root")"
+  template="$(_w_config_get "$root" '.path' 2>/dev/null)" || template=""
+  # yq prints "null" for missing keys
+  [[ "$template" == "null" || -z "$template" ]] && template="{parent}/{project}.{name}"
+  template="${template//\{project\}/$project}"
+  template="${template//\{name\}/$name}"
+  template="${template//\{parent\}/$parent}"
+  template="${template//\{home\}/$HOME}"
+  printf '%s' "$template"
+}
+
 # --- Subcommands ---
 
 _w_cmd_version() {

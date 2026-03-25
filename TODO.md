@@ -29,11 +29,11 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 3. Config parsing (TOML)
 
-- [ ] `_w_config_file root` — prints path to `$root/.wtconfig.toml`, returns 1 if missing
-- [ ] `_w_config_get root query` — runs `yq -oy "$query" "$root/.wtconfig.toml"`, returns empty/1 if file missing; query is a yq path like `.path`, `.setup.commands[]`, `.server[].name`
-- [ ] `_w_resolve_path root name` — reads path template from config (or uses default `{parent}/{project}.{name}`), performs `${template//\{project\}/$project}` substitutions for `{project}`, `{name}`, `{parent}`, `{home}`, prints resolved absolute path
-- [ ] Tests: verify template expansion for sibling (`{parent}/{project}.{name}`), subdirectory (`{parent}/{project}.worktrees/{name}`), and global (`{home}/worktrees/{project}/{name}`) patterns; verify missing config returns default path
-- [ ] Tests pass
+- [x] `_w_config_file root` — prints path to `$root/.wtconfig.toml`, returns 1 if missing
+- [x] `_w_config_get root query` — runs `tomlq -r "$query" "$root/.wtconfig.toml"`, returns empty/1 if file missing; query is a jq path like `.path`, `.setup.commands[]`, `.server[].name`
+- [x] `_w_resolve_path root name` — reads path template from config (or uses default `{parent}/{project}.{name}`), performs `${template//\{project\}/$project}` substitutions for `{project}`, `{name}`, `{parent}`, `{home}`, prints resolved absolute path
+- [x] Tests: verify template expansion for sibling (`{parent}/{project}.{name}`), subdirectory (`{parent}/{project}.worktrees/{name}`), and global (`{home}/worktrees/{project}/{name}`) patterns; verify missing config returns default path
+- [x] Tests pass
 
 ## 4. Slot allocation
 
