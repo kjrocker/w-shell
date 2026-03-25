@@ -14,10 +14,8 @@ _w() {
         'init:Create .wtconfig.toml in repo root'
         'ls:List all worktrees with status'
         'rm:Remove a worktree'
-        'exit:Navigate to project root'
+        'exit:Hint to leave subshell'
         'status:Show project dashboard'
-        'serve:Start dev servers for a worktree'
-        'stop:Stop dev servers for a worktree'
     )
 
     if (( CURRENT == 2 )); then
@@ -34,24 +32,6 @@ _w() {
                 _w_worktree_names
             else
                 _arguments '--force[Force removal even with unmerged commits]'
-            fi
-            ;;
-        serve)
-            if (( CURRENT == 3 )); then
-                _alternative \
-                    'worktrees:worktree:_w_worktree_names' \
-                    'flags:flag:_arguments "--only=[Start only the named server]:server name"'
-            else
-                _arguments '--only=[Start only the named server]:server name'
-            fi
-            ;;
-        stop)
-            if (( CURRENT == 3 )); then
-                _alternative \
-                    'worktrees:worktree:_w_worktree_names' \
-                    'flags:flag:_arguments "--only=[Stop only the named server]:server name"'
-            else
-                _arguments '--only=[Stop only the named server]:server name'
             fi
             ;;
         init|ls|exit|status)

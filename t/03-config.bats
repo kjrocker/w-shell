@@ -39,17 +39,14 @@ EOF
   [[ "$output" == *"cp .env.example .env"* ]]
 }
 
-@test "_w_config_get reads server name from config" {
+@test "_w_config_get reads env from config" {
   cat > "$TEST_DIR/.wtconfig.toml" <<'EOF'
-[[server]]
-name = "frontend"
-command = "npm run dev"
-port-env = "PORT"
-base-port = 3000
+[env]
+PORT = "{base:3000}"
 EOF
-  run bash -c "source '$W_BIN' --source-only 2>/dev/null; _w_config_get '$TEST_DIR' '.server[0].name'"
+  run bash -c "source '$W_BIN' --source-only 2>/dev/null; _w_config_get '$TEST_DIR' '.env.PORT'"
   [ "$status" -eq 0 ]
-  [ "$output" = "frontend" ]
+  [ "$output" = "{base:3000}" ]
 }
 
 @test "_w_config_get returns 1 when config missing" {

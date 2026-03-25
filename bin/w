@@ -24,11 +24,24 @@ _w_find_main_worktree() {
   echo "$output" | head -1 | awk '{print $1}'
 }
 
-# --- cd-target ---
+# --- Subshell ---
 
-_w_cd_target() {
-  mkdir -p "$STATE_DIR"
-  printf '%s' "$1" > "$STATE_DIR/cd-target"
+_w_spawn_subshell() {
+  local path="$1" root="$2" name="$3" slot="$4"
+  if [[ -n "${W_WORKTREE:-}" ]]; then
+    echo "Already in worktree '$W_WORKTREE'. Type 'exit' to leave first." >&2
+    return 1
+  fi
+  local env_args=()
+  local env_lines
+  env_lines="$(_w_build_env "$root" "$name" "$slot")"
+  if [[ -n "$env_lines" ]]; then
+    while IFS='=' read -r key val; do
+      env_args+=("$key=$val")
+    done <<< "$env_lines"
+  fi
+  env_args+=("W_WORKTREE=$name" "W_PROJECT=$(_w_project_name "$root")" "W_ROOT=$root")
+  cd "$path" && exec env "${env_args[@]}" "${SHELL:-/bin/bash}"
 }
 
 # --- Color helpers ---
@@ -148,6 +161,24 @@ _w_resolve_path() {
   printf '%s' "$template"
 }
 
+_w_build_env() {
+  local root="$1" name="$2" slot="$3"
+  local env_json
+  env_json="$(_w_config_get "$root" '.env' 2>/dev/null)" || return 0
+  [[ -z "$env_json" || "$env_json" == "null" ]] && return 0
+  local project
+  project="$(_w_project_name "$root")"
+  printf '%s' "$env_json" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' | while IFS=$'\t' read -r key val; do
+    # {base:N} → N + slot
+    if [[ "$val" =~ ^\{base:([0-9]+)\}$ ]]; then
+      val=$(( ${BASH_REMATCH[1]} + slot ))
+    fi
+    val="${val//\{name\}/$name}"
+    val="${val//\{project\}/$project}"
+    printf '%s=%s\n' "$key" "$val"
+  done
+}
+
 # --- Slot allocation ---
 
 _w_project_id() {
@@ -256,29 +287,6 @@ _w_run_setup() {
   done <<< "$commands"
 }
 
-# --- Ports (read-only helpers for ls/status) ---
-
-_w_ports_file() {
-  local root="$1"
-  printf '%s' "$(_w_state_dir "$root")/ports.json"
-}
-
-_w_read_ports() {
-  local root="$1"
-  local file
-  file="$(_w_ports_file "$root")"
-  if [[ -f "$file" ]]; then
-    cat "$file"
-  else
-    echo '{}'
-  fi
-}
-
-_w_write_ports() {
-  local root="$1" json="$2"
-  printf '%s\n' "$json" > "$(_w_ports_file "$root")"
-}
-
 # --- Worktree name resolution ---
 
 _w_current_worktree_name() {
@@ -307,44 +315,25 @@ _w_format_status() {
   fi
 }
 
-_w_server_status_line() {
+_w_env_status_line() {
   local name="$1" root="$2"
-  local ports_json
-  ports_json="$(_w_read_ports "$root")"
-  local entries
-  entries="$(printf '%s' "$ports_json" | jq -r --arg n "$name" '
-    .[$n].servers // {} | to_entries[] | "\(.value.port)\t\(.value.pid)"
-  ' 2>/dev/null)" || return 0
-  [[ -n "$entries" ]] || return 0
-  local live_ports=""
-  while IFS=$'\t' read -r port pid; do
-    if [[ -n "$pid" && -d "/proc/$pid" ]]; then
-      [[ -n "$live_ports" ]] && live_ports="$live_ports,"
-      live_ports="$live_ports:$port"
-    fi
-  done <<< "$entries"
-  [[ -n "$live_ports" ]] || return 0
-  printf '● server running %s' "$live_ports"
-}
-
-_w_server_status_block() {
-  local name="$1" root="$2"
-  local ports_json
-  ports_json="$(_w_read_ports "$root")"
-  local has_entry
-  has_entry="$(printf '%s' "$ports_json" | jq -r --arg n "$name" 'has($n) | tostring')"
-  [[ "$has_entry" == "true" ]] || return 0
-  # Output sorted server entries: name\tport\tpid\talive
-  printf '%s' "$ports_json" | jq -r --arg n "$name" '
-    .[$n].servers // {} | to_entries | sort_by(.key)[] |
-    "\(.key)\t\(.value.port)\t\(.value.pid)"
-  ' | while IFS=$'\t' read -r srv port pid; do
-    local alive="false"
-    if [[ -n "$pid" && -d "/proc/$pid" ]]; then
-      alive="true"
-    fi
-    printf '%s\t%s\t%s\t%s\n' "$srv" "$port" "$pid" "$alive"
-  done
+  local slot
+  if [[ "$name" == "main" ]]; then
+    slot=0
+  else
+    slot="$(_w_slot_get "$name" "$root")"
+    [[ -z "$slot" ]] && return 0
+  fi
+  local env_lines
+  env_lines="$(_w_build_env "$root" "$name" "$slot")" || return 0
+  [[ -z "$env_lines" ]] && return 0
+  # Show compact KEY=val pairs
+  local parts=""
+  while IFS='=' read -r key val; do
+    [[ -n "$parts" ]] && parts="$parts "
+    parts="$parts$key=$val"
+  done <<< "$env_lines"
+  printf '%s' "$parts"
 }
 
 # --- Subcommands ---
@@ -354,10 +343,11 @@ _w_cmd_version() {
 }
 
 _w_cmd_exit() {
-  local main_wt
-  main_wt="$(_w_find_main_worktree)"
-  echo "→ $main_wt" >&2
-  _w_cd_target "$main_wt"
+  if [[ -n "${W_WORKTREE:-}" ]]; then
+    echo "Type 'exit' to leave worktree '$W_WORKTREE'." >&2
+  else
+    echo "Not in a w subshell." >&2
+  fi
 }
 
 _w_cmd_go() {
@@ -374,19 +364,19 @@ _w_cmd_go() {
     return
   fi
 
-  if [[ -d "$path" && -e "$path/.git" ]]; then
-    # Existing worktree — just cd
-    echo "→ $path" >&2
-    _w_cd_target "$path"
-  else
-    # Create new worktree
+  if [[ ! -d "$path" || ! -e "$path/.git" ]]; then
     echo "Creating worktree $name..." >&2
     _w_create_worktree "$name" "$path" "$root"
     _w_slot_assign "$name" "$root" > /dev/null
     _w_run_setup "$path" "$root"
-    echo "→ $path" >&2
-    _w_cd_target "$path"
   fi
+
+  local slot
+  slot="$(_w_slot_get "$name" "$root")"
+  [[ -z "$slot" ]] && slot=0
+
+  echo "→ $path" >&2
+  _w_spawn_subshell "$path" "$root" "$name" "$slot"
 }
 
 _w_cmd_run() {
@@ -399,7 +389,18 @@ _w_cmd_run() {
     echo "Worktree $name does not exist" >&2
     exit 1
   fi
-  (cd "$path" && eval "$@")
+  local slot
+  slot="$(_w_slot_get "$name" "$root")"
+  [[ -z "$slot" ]] && slot=0
+  local env_args=("W_WORKTREE=$name" "W_PROJECT=$(_w_project_name "$root")")
+  local env_lines
+  env_lines="$(_w_build_env "$root" "$name" "$slot")"
+  if [[ -n "$env_lines" ]]; then
+    while IFS='=' read -r key val; do
+      env_args+=("$key=$val")
+    done <<< "$env_lines"
+  fi
+  (cd "$path" && env "${env_args[@]}" bash -c "$*")
 }
 
 _w_cmd_ls() {
@@ -435,18 +436,14 @@ _w_cmd_ls() {
     ab="$(_w_worktree_ahead_behind "$wt_path")"
     [[ -n "$ab" ]] && ab="$(_w_cyan "$ab")"
 
-    local srv_status
-    srv_status="$(_w_server_status_line "$name" "$root")"
+    local env_status
+    env_status="$(_w_env_status_line "$name" "$root")"
 
-    # Build line: marker  name(padded)  status  [ahead/behind]  [server]
+    # Build line: marker  name(padded)  status  [ahead/behind]  [env]
     local line
     line="$(printf '%s  %-15s  %s' "$marker" "$display_name" "$status_str")"
     [[ -n "$ab" ]] && line="$line  $ab"
-    if [[ -n "$srv_status" ]]; then
-      local formatted_srv
-      formatted_srv="$(_w_green "●") ${srv_status#● }"
-      line="$line  $formatted_srv"
-    fi
+    [[ -n "$env_status" ]] && line="$line  $(_w_dim "$env_status")"
     echo "$line"
   done
 }
@@ -497,159 +494,19 @@ _w_cmd_status() {
     ab="$(_w_worktree_ahead_behind "$wt_path")"
     [[ -n "$ab" ]] && ab="$(_w_cyan "$ab")"
 
+    local env_status
+    env_status="$(_w_env_status_line "$name" "$root")"
+
     local line
     line="$(printf '%s  %-15s  %s' "$marker" "$display_name" "$status_str")"
     [[ -n "$ab" ]] && line="$line  $ab"
     echo "$line"
 
-    # Show server details
-    local srv_block
-    srv_block="$(_w_server_status_block "$name" "$root")"
-    if [[ -n "$srv_block" ]]; then
-      local total
-      total="$(echo "$srv_block" | wc -l)"
-      local i=0
-      echo "$srv_block" | while IFS=$'\t' read -r srv port pid alive; do
-        i=$((i + 1))
-        local connector="├"
-        [[ "$i" -eq "$total" ]] && connector="└"
-        local srv_status_str
-        if [[ "$alive" == "true" ]]; then
-          srv_status_str="$(_w_green "pid $pid")"
-        else
-          srv_status_str="$(_w_red "stopped")"
-        fi
-        echo "              $connector $srv  $(_w_cyan ":$port")  ($srv_status_str)"
-      done
+    # Show env var details
+    if [[ -n "$env_status" ]]; then
+      echo "              $(_w_dim "$env_status")"
     fi
   done
-}
-
-_w_cmd_serve() {
-  local name="" only=""
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --only=*) only="${1#--only=}"; shift ;;
-      --only)   only="$2"; shift 2 ;;
-      *)        name="$1"; shift ;;
-    esac
-  done
-
-  local root
-  root="$(_w_find_root)"
-
-  [[ -z "$name" ]] && name="$(_w_current_worktree_name "$root")"
-
-  # Read server configs from .wtconfig.toml
-  local server_json
-  server_json="$(_w_config_get "$root" '.server' 2>/dev/null)" || server_json=""
-  [[ -z "$server_json" || "$server_json" == "null" ]] && { echo "No servers configured" >&2; return 1; }
-
-  local slot
-  slot="$(_w_slot_get "$name" "$root")"
-  [[ -z "$slot" ]] && slot=0
-
-  local ports_json
-  ports_json="$(_w_read_ports "$root")"
-
-  # Initialize entry for this worktree
-  ports_json="$(printf '%s' "$ports_json" | jq --arg n "$name" --argjson s "$slot" '
-    .[$n] //= {} | .[$n].slot = $s | .[$n].servers //= {}
-  ')"
-
-  # Resolve worktree path for working directory
-  local wt_path
-  wt_path="$(_w_resolve_path "$root" "$name")"
-  # For main, use the root itself
-  [[ "$name" == "main" ]] && wt_path="$root"
-
-  # Iterate over server configs
-  local count
-  count="$(printf '%s' "$server_json" | jq 'length')"
-  local i=0
-  while [[ "$i" -lt "$count" ]]; do
-    local srv_name srv_command port_env base_port
-    srv_name="$(printf '%s' "$server_json" | jq -r ".[$i].name")"
-    srv_command="$(printf '%s' "$server_json" | jq -r ".[$i].command")"
-    port_env="$(printf '%s' "$server_json" | jq -r --argjson i "$i" '.[$i]["port-env"]')"
-    base_port="$(printf '%s' "$server_json" | jq -r --argjson i "$i" '.[$i]["base-port"]')"
-
-    i=$((i + 1))
-
-    # Filter by --only
-    [[ -n "$only" && "$srv_name" != "$only" ]] && continue
-
-    local port=$((base_port + slot))
-    echo "Starting $srv_name ($srv_command) on :$port..." >&2
-
-    # Start the server process in background (exec to avoid intermediate shell)
-    env "${port_env}=${port}" sh -c "exec $srv_command" </dev/null >/dev/null 2>&1 &
-    local pid=$!
-
-    # Update ports JSON
-    ports_json="$(printf '%s' "$ports_json" | jq \
-      --arg n "$name" --arg srv "$srv_name" \
-      --argjson port "$port" --argjson pid "$pid" \
-      '.[$n].servers[$srv] = { port: $port, pid: $pid }')"
-  done
-
-  _w_write_ports "$root" "$ports_json"
-}
-
-_w_cmd_stop() {
-  local name="" only=""
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --only=*) only="${1#--only=}"; shift ;;
-      --only)   only="$2"; shift 2 ;;
-      *)        name="$1"; shift ;;
-    esac
-  done
-
-  local root
-  root="$(_w_find_root)"
-
-  [[ -z "$name" ]] && name="$(_w_current_worktree_name "$root")"
-
-  local ports_json
-  ports_json="$(_w_read_ports "$root")"
-
-  # Check if entry exists
-  local has_entry
-  has_entry="$(printf '%s' "$ports_json" | jq -r --arg n "$name" 'has($n) | tostring')"
-  [[ "$has_entry" != "true" ]] && return 0
-
-  # Get server entries
-  local servers
-  servers="$(printf '%s' "$ports_json" | jq -r --arg n "$name" '
-    .[$n].servers // {} | to_entries[] | "\(.key)\t\(.value.pid)"
-  ')"
-
-  while IFS=$'\t' read -r srv_name srv_pid; do
-    [[ -z "$srv_name" ]] && continue
-    [[ -n "$only" && "$srv_name" != "$only" ]] && continue
-
-    if [[ -n "$srv_pid" && -d "/proc/$srv_pid" ]]; then
-      echo "Stopping $srv_name (pid $srv_pid)..." >&2
-      kill "$srv_pid" 2>/dev/null || true
-      sleep 0.3
-      if [[ -d "/proc/$srv_pid" ]]; then
-        kill -9 "$srv_pid" 2>/dev/null || true
-        sleep 0.1
-      fi
-    fi
-  done <<< "$servers"
-
-  # Update ports.json
-  if [[ -n "$only" ]]; then
-    ports_json="$(printf '%s' "$ports_json" | jq --arg n "$name" --arg srv "$only" '
-      .[$n].servers |= del(.[$srv]) |
-      if (.[$n].servers | length) == 0 then del(.[$n]) else . end
-    ')"
-  else
-    ports_json="$(printf '%s' "$ports_json" | jq --arg n "$name" 'del(.[$n])')"
-  fi
-  _w_write_ports "$root" "$ports_json"
 }
 
 _w_cmd_rm() {
@@ -663,11 +520,13 @@ _w_cmd_rm() {
 
   [[ -z "$name" ]] && { echo "Usage: w rm <name> [--force]" >&2; exit 1; }
 
+  if [[ "${W_WORKTREE:-}" == "$name" ]]; then
+    echo "Cannot remove worktree '$name' while inside it. Type 'exit' first." >&2
+    exit 1
+  fi
+
   local root
   root="$(_w_find_root)"
-
-  # Stop servers first
-  _w_cmd_stop "$name"
 
   # Check for unmerged commits unless --force
   if [[ "$force" != "true" ]]; then
@@ -714,25 +573,38 @@ _w_cmd_init() {
     exit 1
   fi
   cat > "$cfg" <<'TOML'
+# Worktree directory layout (default: sibling directories)
 # path = "{parent}/{project}.{name}"
+#
+# Available tokens: {project}, {name}, {parent}, {home}
+# Examples:
+#   "{parent}/{project}.worktrees/{name}"  — subdirectory of project
+#   "{home}/worktrees/{project}/{name}"    — global worktree directory
 
 [setup]
 commands = []
+# commands = ["npm install", "cp .env.example .env"]
+
+# Environment variables exported into the worktree subshell.
+# Use {base:N} for port allocation (N + worktree slot).
+# Use {name} for worktree name, {project} for project name.
+#
+# [env]
+# PORT = "{base:3000}"
+# API_PORT = "{base:8080}"
+# DATABASE_URL = "postgres://localhost/myapp_{name}"
 TOML
   echo "Created $cfg" >&2
 }
 
 _w_cmd_help() {
   cat >&2 <<'EOF'
-Usage: w <name>          Switch to (or create) worktree
+Usage: w <name>          Enter worktree (spawns subshell)
        w <name> <cmd>    Run command in worktree
        w init            Create .wtconfig.toml in repo root
        w ls              List worktrees
        w status          Project dashboard
        w rm <name>       Remove worktree
-       w exit            Return to main worktree
-       w serve [name]    Start dev servers
-       w stop [name]     Stop dev servers
        w --version       Print version
        w --help          Show this help
 EOF
@@ -748,8 +620,6 @@ main() {
     rm)        shift; _w_cmd_rm "$@" ;;
     exit)      shift; _w_cmd_exit "$@" ;;
     status)    shift; _w_cmd_status "$@" ;;
-    serve)     shift; _w_cmd_serve "$@" ;;
-    stop)      shift; _w_cmd_stop "$@" ;;
     --version) _w_cmd_version ;;
     --help)    _w_cmd_help ;;
     "")        _w_cmd_help ;;

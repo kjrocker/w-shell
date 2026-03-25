@@ -38,49 +38,92 @@ load helpers
   [[ ! -f "$TEST_DIR/sub/dir/.wtconfig.toml" ]]
 }
 
-# --- _w_cmd_exit ---
-
-@test "exit writes main worktree to cd-target" {
+@test "init skeleton includes env section comment" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
-  _w_cmd_exit
-  [[ -f "$W_STATE_DIR/cd-target" ]]
-  local target
-  target="$(cat "$W_STATE_DIR/cd-target")"
-  [[ "$target" == "$TEST_DIR" ]]
+  _w_cmd_init
+  grep -q '\[env\]' "$TEST_DIR/.wtconfig.toml"
+  grep -q 'base:3000' "$TEST_DIR/.wtconfig.toml"
+}
+
+# --- _w_cmd_exit ---
+
+@test "exit prints hint when in subshell" {
+  run bash -c "export W_STATE_DIR='$W_STATE_DIR' W_WORKTREE=feat-x; source '$W_BIN' --source-only 2>/dev/null; _w_cmd_exit"
+  [[ "$output" == *"exit"* ]]
+  [[ "$output" == *"feat-x"* ]]
+}
+
+@test "exit prints not-in-subshell when outside" {
+  run bash -c "export W_STATE_DIR='$W_STATE_DIR'; unset W_WORKTREE; source '$W_BIN' --source-only 2>/dev/null; _w_cmd_exit"
+  [[ "$output" == *"Not in a w subshell"* ]]
 }
 
 # --- _w_cmd_go ---
 
 @test "go to new name creates worktree and slot" {
+  cd "$TEST_DIR"
+  # Use /usr/bin/env as SHELL so the exec prints env and exits
+  run bash -c "
+    export W_STATE_DIR='$W_STATE_DIR' SHELL=/usr/bin/env NO_COLOR=1
+    source '$W_BIN' --source-only 2>/dev/null
+    cd '$TEST_DIR'
+    _w_cmd_go feat-test
+  "
+  [[ "$status" -eq 0 ]]
+  # The worktree should exist
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
-  _w_cmd_go feat-test
-  # cd-target should be set
-  [[ -f "$W_STATE_DIR/cd-target" ]]
-  local target
-  target="$(cat "$W_STATE_DIR/cd-target")"
-  # The worktree should exist at the resolved path
-  [[ -d "$target" ]]
-  [[ -e "$target/.git" ]]
+  local path
+  path="$(_w_resolve_path "$TEST_DIR" feat-test)"
+  [[ -d "$path" ]]
+  [[ -e "$path/.git" ]]
   # Slot should be assigned
   local slot
   slot="$(_w_slot_get feat-test "$TEST_DIR")"
   [[ "$slot" == "1" ]]
 }
 
-@test "go to existing worktree writes cd-target" {
-  source "$W_BIN" --source-only
+@test "go spawns subshell with W_WORKTREE set" {
   cd "$TEST_DIR"
-  # Create worktree first
-  _w_cmd_go feat-exist
-  rm -f "$W_STATE_DIR/cd-target"
-  # Go again — should just set cd-target
-  _w_cmd_go feat-exist
-  [[ -f "$W_STATE_DIR/cd-target" ]]
-  local target
-  target="$(cat "$W_STATE_DIR/cd-target")"
-  [[ -d "$target" ]]
+  local output
+  output="$(
+    export W_STATE_DIR="$W_STATE_DIR" SHELL=/usr/bin/env NO_COLOR=1
+    source "$W_BIN" --source-only 2>/dev/null
+    cd "$TEST_DIR"
+    _w_cmd_go feat-env 2>/dev/null
+  )"
+  [[ "$output" == *"W_WORKTREE=feat-env"* ]]
+  [[ "$output" == *"W_PROJECT="* ]]
+  [[ "$output" == *"W_ROOT="* ]]
+}
+
+@test "go spawns subshell with computed env vars" {
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+PORT = "{base:3000}"
+TOML
+  local output
+  output="$(
+    export W_STATE_DIR="$W_STATE_DIR" SHELL=/usr/bin/env NO_COLOR=1
+    source "$W_BIN" --source-only 2>/dev/null
+    cd "$TEST_DIR"
+    _w_cmd_go feat-port 2>/dev/null
+  )"
+  # slot 1 + base 3000 = 3001
+  [[ "$output" == *"PORT=3001"* ]]
+}
+
+@test "go refuses when already in subshell" {
+  run bash -c "
+    export W_STATE_DIR='$W_STATE_DIR' W_WORKTREE=existing SHELL=/usr/bin/env NO_COLOR=1
+    source '$W_BIN' --source-only 2>/dev/null
+    cd '$TEST_DIR'
+    _w_cmd_go another
+  "
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"Already in worktree"* ]]
 }
 
 # --- _w_create_worktree ---
@@ -122,12 +165,10 @@ load helpers
   cd "$TEST_DIR"
   local root
   root="$(_w_find_root)"
-  # Create a .wtconfig.toml with setup commands
   cat > "$root/.wtconfig.toml" <<'TOML'
 [setup]
 commands = ["touch setup-marker"]
 TOML
-  # Create a worktree to run setup in
   local parent project path
   parent="$(_w_parent_dir "$root")"
   project="$(_w_project_name "$root")"
@@ -142,7 +183,6 @@ TOML
   cd "$TEST_DIR"
   local root
   root="$(_w_find_root)"
-  # No .wtconfig.toml — should not fail
   _w_run_setup "$TEST_DIR" "$root"
 }
 
@@ -151,14 +191,45 @@ TOML
 @test "run executes command in worktree directory" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
-  # Create a worktree first
-  _w_cmd_go run-test
-  rm -f "$W_STATE_DIR/cd-target"
+  # Create a worktree directly (bypass _w_cmd_go which execs)
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" run-test)"
+  _w_create_worktree run-test "$path" "$root"
+  _w_slot_assign run-test "$root" > /dev/null
   local output
   output="$(_w_cmd_run run-test pwd)"
-  local expected
-  expected="$(_w_resolve_path "$(_w_find_root)" run-test)"
-  [[ "$output" == "$expected" ]]
+  [[ "$output" == "$path" ]]
+}
+
+@test "run passes env vars to command" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+PORT = "{base:3000}"
+TOML
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" env-run)"
+  _w_create_worktree env-run "$path" "$root"
+  _w_slot_assign env-run "$root" > /dev/null
+  local output
+  output="$(_w_cmd_run env-run 'echo $PORT')"
+  [[ "$output" == "3001" ]]
+}
+
+@test "run sets W_WORKTREE" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" meta-run)"
+  _w_create_worktree meta-run "$path" "$root"
+  _w_slot_assign meta-run "$root" > /dev/null
+  local output
+  output="$(_w_cmd_run meta-run 'echo $W_WORKTREE')"
+  [[ "$output" == "meta-run" ]]
 }
 
 @test "run dies if worktree does not exist" {
@@ -174,14 +245,13 @@ TOML
 @test "go with extra args runs command in worktree" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
-  # Create worktree first
-  _w_cmd_go cmd-test
-  rm -f "$W_STATE_DIR/cd-target"
+  # Create worktree directly
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" cmd-test)"
+  _w_create_worktree cmd-test "$path" "$root"
+  _w_slot_assign cmd-test "$root" > /dev/null
   local output
   output="$(_w_cmd_go cmd-test pwd)"
-  local expected
-  expected="$(_w_resolve_path "$(_w_find_root)" cmd-test)"
-  [[ "$output" == "$expected" ]]
-  # Should NOT set cd-target
-  [[ ! -f "$W_STATE_DIR/cd-target" ]]
+  [[ "$output" == "$path" ]]
 }

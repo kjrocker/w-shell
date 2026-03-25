@@ -34,12 +34,6 @@ load helpers
   [ "$output" = "$TEST_DIR" ]
 }
 
-@test "_w_cd_target writes path to cd-target file" {
-  run bash -c "export W_STATE_DIR='$W_STATE_DIR'; source '$W_BIN' --source-only 2>/dev/null; _w_cd_target /some/path"
-  [ "$status" -eq 0 ]
-  [ "$(cat "$W_STATE_DIR/cd-target")" = "/some/path" ]
-}
-
 @test "--version prints version string" {
   run_w --version
   [ "$status" -eq 0 ]
