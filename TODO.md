@@ -47,14 +47,14 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 5. Subcommands: exit, version, navigate/create
 
-- [ ] `_w_cmd_version` — prints `w <VERSION>` to stdout
-- [ ] `_w_cmd_exit` — calls `_w_find_main_worktree`, writes result to cd-target via `_w_cd_target`
-- [ ] `_w_cmd_go name` — calls `_w_resolve_path` for name; if path exists and has `.git`, writes cd-target; otherwise calls `_w_create_worktree` + `_w_slot_assign` + `_w_run_setup`, then writes cd-target
-- [ ] `_w_create_worktree name path root` — runs `git -C "$root" worktree add -b "$name" "$path" main`; on "already exists" error retries with `git worktree add "$path" "$name"`, dies on other errors
-- [ ] `_w_run_setup path root` — reads `_w_config_get "$root" '.setup.commands[]'`, runs each line with `(cd "$path" && eval "$cmd")`, prints warning to stderr on non-zero exit, continues
-- [ ] `_w_cmd_run name cmd...` — resolves path, dies if worktree doesn't exist, runs `(cd "$path" && eval "$@")`, exits with command's exit code
-- [ ] Tests: exit writes main worktree to cd-target; go to existing worktree writes cd-target; go to new name creates worktree + slot; run echoes from correct directory
-- [ ] Tests pass
+- [x] `_w_cmd_version` — prints `w <VERSION>` to stdout
+- [x] `_w_cmd_exit` — calls `_w_find_main_worktree`, writes result to cd-target via `_w_cd_target`
+- [x] `_w_cmd_go name` — calls `_w_resolve_path` for name; if path exists and has `.git`, writes cd-target; otherwise calls `_w_create_worktree` + `_w_slot_assign` + `_w_run_setup`, then writes cd-target
+- [x] `_w_create_worktree name path root` — runs `git -C "$root" worktree add -b "$name" "$path" main`; on "already exists" error retries with `git worktree add "$path" "$name"`, dies on other errors
+- [x] `_w_run_setup path root` — reads `_w_config_get "$root" '.setup.commands[]'`, runs each line with `(cd "$path" && eval "$cmd")`, prints warning to stderr on non-zero exit, continues
+- [x] `_w_cmd_run name cmd...` — resolves path, dies if worktree doesn't exist, runs `(cd "$path" && eval "$@")`, exits with command's exit code
+- [x] Tests: exit writes main worktree to cd-target; go to existing worktree writes cd-target; go to new name creates worktree + slot; run echoes from correct directory
+- [x] Tests pass
 
 ## 6. Subcommands: ls, status
 

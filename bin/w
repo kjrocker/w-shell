@@ -223,10 +223,92 @@ _w_slot_get() {
   printf '%s' "$val"
 }
 
+# --- Worktree creation ---
+
+_w_create_worktree() {
+  local name="$1" path="$2" root="$3"
+  mkdir -p "$(dirname "$path")"
+  local err
+  if ! err="$(git -C "$root" worktree add -b "$name" "$path" main 2>&1)"; then
+    if [[ "$err" == *"already exists"* ]]; then
+      if ! err="$(git -C "$root" worktree add "$path" "$name" 2>&1)"; then
+        echo "Failed to create worktree: $err" >&2
+        exit 1
+      fi
+    else
+      echo "Failed to create worktree: $err" >&2
+      exit 1
+    fi
+  fi
+}
+
+_w_run_setup() {
+  local path="$1" root="$2"
+  local commands
+  commands="$(_w_config_get "$root" '.setup.commands[]' 2>/dev/null)" || return 0
+  [[ -z "$commands" || "$commands" == "null" ]] && return 0
+  while IFS= read -r cmd; do
+    [[ -z "$cmd" ]] && continue
+    echo "Running setup: $cmd" >&2
+    if ! (cd "$path" && eval "$cmd"); then
+      echo "Warning: setup command '$cmd' failed" >&2
+    fi
+  done <<< "$commands"
+}
+
 # --- Subcommands ---
 
 _w_cmd_version() {
   echo "w $VERSION"
+}
+
+_w_cmd_exit() {
+  local main_wt
+  main_wt="$(_w_find_main_worktree)"
+  echo "→ $main_wt" >&2
+  _w_cd_target "$main_wt"
+}
+
+_w_cmd_go() {
+  local name="$1"
+  shift
+  local root path
+  root="$(_w_find_root)"
+
+  path="$(_w_resolve_path "$root" "$name")"
+
+  # If extra args, delegate to run
+  if [[ $# -gt 0 ]]; then
+    _w_cmd_run "$name" "$@"
+    return
+  fi
+
+  if [[ -d "$path" && -e "$path/.git" ]]; then
+    # Existing worktree — just cd
+    echo "→ $path" >&2
+    _w_cd_target "$path"
+  else
+    # Create new worktree
+    echo "Creating worktree $name..." >&2
+    _w_create_worktree "$name" "$path" "$root"
+    _w_slot_assign "$name" "$root" > /dev/null
+    _w_run_setup "$path" "$root"
+    echo "→ $path" >&2
+    _w_cd_target "$path"
+  fi
+}
+
+_w_cmd_run() {
+  local name="$1"
+  shift
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" "$name")"
+  if [[ ! -d "$path" || ! -e "$path/.git" ]]; then
+    echo "Worktree $name does not exist" >&2
+    exit 1
+  fi
+  (cd "$path" && eval "$@")
 }
 
 _w_cmd_help() {
