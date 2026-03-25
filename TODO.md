@@ -79,11 +79,11 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 8. Shell integration and completions
 
-- [ ] Port `completions/_w` to work with `bin/w` — dynamic worktree name completion from `git worktree list`, subcommand completion, `--force`/`--only` flag completion
-- [ ] Update `shell/w.zsh` wrapper to handle: no cd-target file, non-zero exit from `bin/w` (don't cd), clean up stale cd-target on wrapper source
-- [ ] Add `shell/w.bash` — bash equivalent of the zsh wrapper + basic `complete -F` completions
-- [ ] End-to-end test: source wrapper in a subshell, run `w <name>`, verify `$PWD` changed
-- [ ] Tests pass
+- [x] Port `completions/_w` to work with `bin/w` — dynamic worktree name completion from `git worktree list`, subcommand completion, `--force`/`--only` flag completion
+- [x] Update `shell/w.zsh` wrapper to handle: no cd-target file, non-zero exit from `bin/w` (don't cd), clean up stale cd-target on wrapper source
+- [x] Add `shell/w.bash` — bash equivalent of the zsh wrapper + basic `complete -F` completions
+- [x] End-to-end test: source wrapper in a subshell, run `w <name>`, verify `$PWD` changed
+- [x] Tests pass
 
 ## 9. Cleanup
 

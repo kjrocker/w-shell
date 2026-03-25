@@ -1,6 +1,6 @@
 #compdef w
 
-# Zsh completion for w (w-raku worktree manager)
+# Zsh completion for w (worktree manager)
 
 _w_worktree_names() {
     local -a worktrees
@@ -31,20 +31,26 @@ _w() {
         rm)
             if (( CURRENT == 3 )); then
                 _w_worktree_names
-            elif (( CURRENT == 4 )); then
+            else
                 _arguments '--force[Force removal even with unmerged commits]'
             fi
             ;;
         serve)
             if (( CURRENT == 3 )); then
-                _w_worktree_names
+                _alternative \
+                    'worktrees:worktree:_w_worktree_names' \
+                    'flags:flag:_arguments "--only=[Start only the named server]:server name"'
             else
                 _arguments '--only=[Start only the named server]:server name'
             fi
             ;;
         stop)
             if (( CURRENT == 3 )); then
-                _w_worktree_names
+                _alternative \
+                    'worktrees:worktree:_w_worktree_names' \
+                    'flags:flag:_arguments "--only=[Stop only the named server]:server name"'
+            else
+                _arguments '--only=[Stop only the named server]:server name'
             fi
             ;;
         ls|exit|status)
