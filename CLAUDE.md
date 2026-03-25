@@ -1,8 +1,6 @@
-# w-raku
+# w
 
 Git worktree manager. Handles worktree create/navigate/list/remove, setup orchestration via `.wtconfig.toml`, dev server management with automatic port allocation. See SPEC.md for full design.
-
-Originally written in Raku (see `lib/` for reference implementation), now being migrated to pure shell for instant startup. See MIGRATION.md for rationale.
 
 ## Build & Run
 
@@ -15,10 +13,6 @@ bats t/
 
 # Run a single test
 bats t/01-core.bats
-
-# Legacy Raku version (reference implementation)
-raku -Ilib bin/w-raku
-prove6 -Ilib t/*.rakutest
 ```
 
 ## Dependencies

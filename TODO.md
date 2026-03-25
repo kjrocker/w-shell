@@ -87,9 +87,9 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 9. Cleanup
 
-- [ ] Run full bats suite, fix any failures
-- [ ] Side-by-side verify: run each subcommand in both Raku and shell versions, confirm matching output
-- [ ] Update CLAUDE.md: replace raku build/run/test instructions with `bats t/`, note `jq`+`tomlq` deps
-- [ ] Update SPEC.md: repo layout, remove Raku feature table, update dependency list
-- [ ] Remove MIGRATION.md
-- [ ] Remove Raku source: `lib/`, `META6.json`, `bin/w-raku` (preserved in git history)
+- [x] Run full bats suite, fix any failures
+- [x] Side-by-side verify: run each subcommand in both Raku and shell versions, confirm matching output
+- [x] Update CLAUDE.md: replace raku build/run/test instructions with `bats t/`, note `jq`+`tomlq` deps
+- [x] Update SPEC.md: repo layout, remove Raku feature table, update dependency list
+- [x] Remove MIGRATION.md
+- [x] Remove Raku source: `lib/`, `META6.json`, `bin/w-raku` (preserved in git history)

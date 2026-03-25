@@ -1,14 +1,14 @@
-# w-raku: Raku Worktree Orchestrator
+# w: Git Worktree Orchestrator
 
-A Raku-powered git worktree manager. Adds setup orchestration, worktree management, dynamic naming, and dev server management with port allocation. Also a vehicle for exercising Raku features (grammars, multi-dispatch MAIN, concurrency).
+A pure-shell git worktree manager. Adds setup orchestration, worktree management, dynamic naming, and dev server management with port allocation.
 
 ## Shell integration
 
-Raku can't `cd` the parent shell. The script writes a target path to `~/.local/state/w/cd-target`; a thin zsh wrapper reads it after exit:
+`bin/w` can't `cd` the parent shell. It writes a target path to `~/.local/state/w/cd-target`; a thin shell wrapper reads it after exit:
 
-```zsh
+```bash
 w() {
-  w-raku "$@"
+  bin/w "$@"
   local target="$HOME/.local/state/w/cd-target"
   if [[ -f "$target" ]]; then
     cd "$(cat "$target")"
@@ -17,7 +17,7 @@ w() {
 }
 ```
 
-All user-facing output goes to stdout/stderr normally from Raku.
+All user-facing output goes to stderr; stdout is reserved for the shell wrapper's cd-target mechanism.
 
 ## Subcommands
 
@@ -219,15 +219,13 @@ Ports are passed to server commands via the env var specified in `port-env`. Add
 ## Repo layout
 
 ```
-w-raku/
+w/
 ├── bin/w                         # Entry point (#!/usr/bin/env bash)
 ├── shell/
 │   ├── w.zsh                     # Zsh wrapper (sources bin/w, handles cd-target)
 │   └── w.bash                    # Bash wrapper
 ├── completions/_w                # Zsh completions
-├── t/                            # Tests (bats)
-├── lib/W/                        # Legacy Raku implementation (reference)
-└── bin/w-raku                    # Legacy Raku entry point (reference)
+└── t/                            # Tests (bats)
 ```
 
 ## Parsing
