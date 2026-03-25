@@ -148,6 +148,81 @@ _w_resolve_path() {
   printf '%s' "$template"
 }
 
+# --- Slot allocation ---
+
+_w_project_id() {
+  local root="$1"
+  local resolved
+  resolved="$(cd "$root" && pwd)"
+  printf '%s' "${resolved//\//_}" | sed 's/^_//'
+}
+
+_w_state_dir() {
+  local root="$1"
+  local dir="$STATE_DIR/projects/$(_w_project_id "$root")"
+  mkdir -p "$dir"
+  printf '%s' "$dir"
+}
+
+_w_slots_file() {
+  printf '%s' "$(_w_state_dir "$1")/slots.json"
+}
+
+_w_read_slots() {
+  local file
+  file="$(_w_slots_file "$1")"
+  if [[ -f "$file" ]]; then
+    cat "$file"
+  else
+    echo '{}'
+  fi
+}
+
+_w_write_slots() {
+  local root="$1" json="$2"
+  printf '%s\n' "$json" > "$(_w_slots_file "$root")"
+}
+
+_w_slot_assign() {
+  local name="$1" root="$2"
+  local slots existing
+  slots="$(_w_read_slots "$root")"
+  # Already assigned? Return existing slot
+  existing="$(printf '%s' "$slots" | jq -r --arg n "$name" '.[$n] // empty')"
+  if [[ -n "$existing" ]]; then
+    printf '%s' "$existing"
+    return
+  fi
+  # Find lowest available slot >= 1
+  local slot
+  slot="$(printf '%s' "$slots" | jq '[.[] | tonumber] | . as $used | 1 | until(. as $s | $used | index($s) | not; . + 1)')"
+  # Write updated slots
+  local updated
+  updated="$(printf '%s' "$slots" | jq --arg n "$name" --argjson s "$slot" '. + {($n): $s}')"
+  _w_write_slots "$root" "$updated"
+  printf '%s' "$slot"
+}
+
+_w_slot_free() {
+  local name="$1" root="$2"
+  local slots updated
+  slots="$(_w_read_slots "$root")"
+  updated="$(printf '%s' "$slots" | jq --arg n "$name" 'del(.[$n])')"
+  _w_write_slots "$root" "$updated"
+}
+
+_w_slot_get() {
+  local name="$1" root="$2"
+  if [[ "$name" == "main" ]]; then
+    printf '0'
+    return
+  fi
+  local slots val
+  slots="$(_w_read_slots "$root")"
+  val="$(printf '%s' "$slots" | jq -r --arg n "$name" '.[$n] // empty')"
+  printf '%s' "$val"
+}
+
 # --- Subcommands ---
 
 _w_cmd_version() {

@@ -37,13 +37,13 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 4. Slot allocation
 
-- [ ] `_w_project_id root` — prints repo root with `/` replaced by `_` and leading `_` stripped (filesystem-safe identifier)
-- [ ] `_w_state_dir root` — prints `$STATE_DIR/projects/$(_w_project_id "$root")`, runs `mkdir -p` on it
-- [ ] `_w_slot_assign name root` — reads `slots.json` via jq, if name already assigned prints existing slot, otherwise finds lowest int >= 1 not in `.[]` values, writes updated JSON, prints assigned slot
-- [ ] `_w_slot_free name root` — deletes key `name` from `slots.json` via `jq 'del(.[$name])'`, writes back
-- [ ] `_w_slot_get name root` — prints 0 if name is "main", otherwise prints slot from `slots.json` (empty if unassigned)
-- [ ] Tests: assign slots to a, b, c (expect 1,2,3), free b, assign d (expect reuses 2), get main returns 0
-- [ ] Tests pass
+- [x] `_w_project_id root` — prints repo root with `/` replaced by `_` and leading `_` stripped (filesystem-safe identifier)
+- [x] `_w_state_dir root` — prints `$STATE_DIR/projects/$(_w_project_id "$root")`, runs `mkdir -p` on it
+- [x] `_w_slot_assign name root` — reads `slots.json` via jq, if name already assigned prints existing slot, otherwise finds lowest int >= 1 not in `.[]` values, writes updated JSON, prints assigned slot
+- [x] `_w_slot_free name root` — deletes key `name` from `slots.json` via `jq 'del(.[$name])'`, writes back
+- [x] `_w_slot_get name root` — prints 0 if name is "main", otherwise prints slot from `slots.json` (empty if unassigned)
+- [x] Tests: assign slots to a, b, c (expect 1,2,3), free b, assign d (expect reuses 2), get main returns 0
+- [x] Tests pass
 
 ## 5. Subcommands: exit, version, navigate/create
 
