@@ -68,14 +68,14 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 7. Subcommands: serve, stop, rm
 
-- [ ] `_w_ports_file root` — prints `$(_w_state_dir "$root")/ports.json`
-- [ ] `_w_read_ports root` — cats ports.json if it exists, otherwise prints `{}`
-- [ ] `_w_write_ports root json` — writes json string to ports.json
-- [ ] `_w_cmd_serve [name] [--only=srv]` — for each `[[server]]` in config (filtered by `--only`): computes `port = base-port + slot`, starts `sh -c "$command"` in background with `$port_env=$port`, captures `$!` as PID, updates ports.json with slot/port/pid per server
-- [ ] `_w_cmd_stop [name] [--only=srv]` — reads ports.json, for each server (filtered by `--only`): sends SIGTERM, sleeps 0.2s, sends SIGKILL if `/proc/$pid` still exists; removes entry from ports.json (removes whole worktree key if no servers remain)
-- [ ] `_w_cmd_rm name [--force]` — calls `_w_cmd_stop "$name"`, then unless `--force` checks `git log --oneline main..$name` for unmerged commits (dies if any), runs `git worktree remove`, calls `_w_slot_free`
-- [ ] Tests: serve starts a `sleep 600` background process, verify PID appears in ports.json and `/proc/$pid` exists; stop kills it, verify PID gone and ports.json cleaned; rm on branch with unmerged commit dies without `--force`, succeeds with `--force`
-- [ ] Tests pass
+- [x] `_w_ports_file root` — prints `$(_w_state_dir "$root")/ports.json`
+- [x] `_w_read_ports root` — cats ports.json if it exists, otherwise prints `{}`
+- [x] `_w_write_ports root json` — writes json string to ports.json
+- [x] `_w_cmd_serve [name] [--only=srv]` — for each `[[server]]` in config (filtered by `--only`): computes `port = base-port + slot`, starts `sh -c "$command"` in background with `$port_env=$port`, captures `$!` as PID, updates ports.json with slot/port/pid per server
+- [x] `_w_cmd_stop [name] [--only=srv]` — reads ports.json, for each server (filtered by `--only`): sends SIGTERM, sleeps 0.2s, sends SIGKILL if `/proc/$pid` still exists; removes entry from ports.json (removes whole worktree key if no servers remain)
+- [x] `_w_cmd_rm name [--force]` — calls `_w_cmd_stop "$name"`, then unless `--force` checks `git log --oneline main..$name` for unmerged commits (dies if any), runs `git worktree remove`, calls `_w_slot_free`
+- [x] Tests: serve starts a `sleep 600` background process, verify PID appears in ports.json and `/proc/$pid` exists; stop kills it, verify PID gone and ports.json cleaned; rm on branch with unmerged commit dies without `--force`, succeeds with `--force`
+- [x] Tests pass
 
 ## 8. Shell integration and completions
 

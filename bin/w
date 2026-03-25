@@ -274,6 +274,26 @@ _w_read_ports() {
   fi
 }
 
+_w_write_ports() {
+  local root="$1" json="$2"
+  printf '%s\n' "$json" > "$(_w_ports_file "$root")"
+}
+
+# --- Worktree name resolution ---
+
+_w_current_worktree_name() {
+  local root="$1"
+  local cwd
+  cwd="$(pwd)"
+  _w_parse_worktrees "$root" | while IFS=$'\t' read -r wt_path branch sha state; do
+    if [[ "$cwd" == "$wt_path"* ]]; then
+      printf '%s' "${branch:-main}"
+      return
+    fi
+  done
+  printf 'main'
+}
+
 # --- Display formatting ---
 
 _w_format_status() {
@@ -503,6 +523,186 @@ _w_cmd_status() {
       done
     fi
   done
+}
+
+_w_cmd_serve() {
+  local name="" only=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --only=*) only="${1#--only=}"; shift ;;
+      --only)   only="$2"; shift 2 ;;
+      *)        name="$1"; shift ;;
+    esac
+  done
+
+  local root
+  root="$(_w_find_root)"
+
+  [[ -z "$name" ]] && name="$(_w_current_worktree_name "$root")"
+
+  # Read server configs from .wtconfig.toml
+  local server_json
+  server_json="$(_w_config_get "$root" '.server' 2>/dev/null)" || server_json=""
+  [[ -z "$server_json" || "$server_json" == "null" ]] && { echo "No servers configured" >&2; return 1; }
+
+  local slot
+  slot="$(_w_slot_get "$name" "$root")"
+  [[ -z "$slot" ]] && slot=0
+
+  local ports_json
+  ports_json="$(_w_read_ports "$root")"
+
+  # Initialize entry for this worktree
+  ports_json="$(printf '%s' "$ports_json" | jq --arg n "$name" --argjson s "$slot" '
+    .[$n] //= {} | .[$n].slot = $s | .[$n].servers //= {}
+  ')"
+
+  # Resolve worktree path for working directory
+  local wt_path
+  wt_path="$(_w_resolve_path "$root" "$name")"
+  # For main, use the root itself
+  [[ "$name" == "main" ]] && wt_path="$root"
+
+  # Iterate over server configs
+  local count
+  count="$(printf '%s' "$server_json" | jq 'length')"
+  local i=0
+  while [[ "$i" -lt "$count" ]]; do
+    local srv_name srv_command port_env base_port
+    srv_name="$(printf '%s' "$server_json" | jq -r ".[$i].name")"
+    srv_command="$(printf '%s' "$server_json" | jq -r ".[$i].command")"
+    port_env="$(printf '%s' "$server_json" | jq -r --argjson i "$i" '.[$i]["port-env"]')"
+    base_port="$(printf '%s' "$server_json" | jq -r --argjson i "$i" '.[$i]["base-port"]')"
+
+    i=$((i + 1))
+
+    # Filter by --only
+    [[ -n "$only" && "$srv_name" != "$only" ]] && continue
+
+    local port=$((base_port + slot))
+    echo "Starting $srv_name ($srv_command) on :$port..." >&2
+
+    # Start the server process in background (exec to avoid intermediate shell)
+    env "${port_env}=${port}" sh -c "exec $srv_command" </dev/null >/dev/null 2>&1 &
+    local pid=$!
+
+    # Update ports JSON
+    ports_json="$(printf '%s' "$ports_json" | jq \
+      --arg n "$name" --arg srv "$srv_name" \
+      --argjson port "$port" --argjson pid "$pid" \
+      '.[$n].servers[$srv] = { port: $port, pid: $pid }')"
+  done
+
+  _w_write_ports "$root" "$ports_json"
+}
+
+_w_cmd_stop() {
+  local name="" only=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --only=*) only="${1#--only=}"; shift ;;
+      --only)   only="$2"; shift 2 ;;
+      *)        name="$1"; shift ;;
+    esac
+  done
+
+  local root
+  root="$(_w_find_root)"
+
+  [[ -z "$name" ]] && name="$(_w_current_worktree_name "$root")"
+
+  local ports_json
+  ports_json="$(_w_read_ports "$root")"
+
+  # Check if entry exists
+  local has_entry
+  has_entry="$(printf '%s' "$ports_json" | jq -r --arg n "$name" 'has($n) | tostring')"
+  [[ "$has_entry" != "true" ]] && return 0
+
+  # Get server entries
+  local servers
+  servers="$(printf '%s' "$ports_json" | jq -r --arg n "$name" '
+    .[$n].servers // {} | to_entries[] | "\(.key)\t\(.value.pid)"
+  ')"
+
+  while IFS=$'\t' read -r srv_name srv_pid; do
+    [[ -z "$srv_name" ]] && continue
+    [[ -n "$only" && "$srv_name" != "$only" ]] && continue
+
+    if [[ -n "$srv_pid" && -d "/proc/$srv_pid" ]]; then
+      echo "Stopping $srv_name (pid $srv_pid)..." >&2
+      kill "$srv_pid" 2>/dev/null || true
+      sleep 0.3
+      if [[ -d "/proc/$srv_pid" ]]; then
+        kill -9 "$srv_pid" 2>/dev/null || true
+        sleep 0.1
+      fi
+    fi
+  done <<< "$servers"
+
+  # Update ports.json
+  if [[ -n "$only" ]]; then
+    ports_json="$(printf '%s' "$ports_json" | jq --arg n "$name" --arg srv "$only" '
+      .[$n].servers |= del(.[$srv]) |
+      if (.[$n].servers | length) == 0 then del(.[$n]) else . end
+    ')"
+  else
+    ports_json="$(printf '%s' "$ports_json" | jq --arg n "$name" 'del(.[$n])')"
+  fi
+  _w_write_ports "$root" "$ports_json"
+}
+
+_w_cmd_rm() {
+  local name="" force="false"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --force) force="true"; shift ;;
+      *)       name="$1"; shift ;;
+    esac
+  done
+
+  [[ -z "$name" ]] && { echo "Usage: w rm <name> [--force]" >&2; exit 1; }
+
+  local root
+  root="$(_w_find_root)"
+
+  # Stop servers first
+  _w_cmd_stop "$name"
+
+  # Check for unmerged commits unless --force
+  if [[ "$force" != "true" ]]; then
+    local unmerged
+    unmerged="$(git -C "$root" log --oneline "main..$name" 2>/dev/null)" || unmerged=""
+    if [[ -n "$unmerged" ]]; then
+      echo "Branch $name has unmerged commits (use --force to override)" >&2
+      exit 1
+    fi
+  fi
+
+  # Find worktree path by branch name
+  local wt_path=""
+  while IFS=$'\t' read -r path branch sha state; do
+    if [[ "$branch" == "$name" ]]; then
+      wt_path="$path"
+      break
+    fi
+  done <<< "$(_w_parse_worktrees "$root")"
+
+  [[ -z "$wt_path" ]] && { echo "Worktree for branch '$name' not found" >&2; exit 1; }
+
+  echo "Removing worktree $name..." >&2
+  local rm_args=("git" "-C" "$root" "worktree" "remove")
+  [[ "$force" == "true" ]] && rm_args+=("--force")
+  rm_args+=("$wt_path")
+
+  local err
+  if ! err="$("${rm_args[@]}" 2>&1)"; then
+    echo "Failed to remove worktree: $err" >&2
+    exit 1
+  fi
+
+  _w_slot_free "$name" "$root"
+  echo "Done." >&2
 }
 
 _w_cmd_help() {
