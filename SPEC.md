@@ -221,9 +221,8 @@ Ports are passed to server commands via the env var specified in `port-env`. Add
 ```
 w/
 ├── bin/w                         # Entry point (#!/usr/bin/env bash)
-├── shell/
-│   ├── w.zsh                     # Zsh wrapper (sources bin/w, handles cd-target)
-│   └── w.bash                    # Bash wrapper
+├── w.zsh                         # Zsh wrapper (sources bin/w, handles cd-target)
+├── w.bash                        # Bash wrapper
 ├── completions/_w                # Zsh completions
 └── t/                            # Tests (bats)
 ```

@@ -1,2 +1,18 @@
 .precomp
 .claude/*.local.*
+
+# Sandbox bind-mount artifacts
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.gitconfig
+.gitmodules
+.ripgreprc
+.mcp.json
+.idea
+.vscode
+
+# Reports
+REPORT.md

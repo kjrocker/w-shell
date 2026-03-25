@@ -1,8 +1,8 @@
 # w shell integration (bash)
 # Source this file in your .bashrc:
-#   source /path/to/w-raku/shell/w.bash
+#   source /path/to/w-raku/w.bash
 
-W_ROOT="${W_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+W_ROOT="${W_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # Clean up stale cd-target on source
 [[ -f "${W_STATE_DIR:-$HOME/.local/state/w}/cd-target" ]] && rm -f "${W_STATE_DIR:-$HOME/.local/state/w}/cd-target"

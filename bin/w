@@ -130,7 +130,7 @@ _w_config_get() {
   local root="$1" query="$2"
   local cfg
   cfg="$(_w_config_file "$root")" || return 1
-  tomlq -r "$query" "$cfg"
+  yq -p toml -oj -r "$query" "$cfg"
 }
 
 _w_resolve_path() {

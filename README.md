@@ -16,10 +16,10 @@ Clone this repo, then source the shell wrapper in your shell rc file:
 
 ```bash
 # zsh — add to ~/.zshrc
-source /path/to/w/shell/w.zsh
+source /path/to/w/w.zsh
 
 # bash — add to ~/.bashrc
-source /path/to/w/shell/w.bash
+source /path/to/w/w.bash
 ```
 
 The wrapper defines a `w` function that calls `bin/w` and handles directory changes. Zsh completions are in `completions/_w`.
