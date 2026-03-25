@@ -256,6 +256,77 @@ _w_run_setup() {
   done <<< "$commands"
 }
 
+# --- Ports (read-only helpers for ls/status) ---
+
+_w_ports_file() {
+  local root="$1"
+  printf '%s' "$(_w_state_dir "$root")/ports.json"
+}
+
+_w_read_ports() {
+  local root="$1"
+  local file
+  file="$(_w_ports_file "$root")"
+  if [[ -f "$file" ]]; then
+    cat "$file"
+  else
+    echo '{}'
+  fi
+}
+
+# --- Display formatting ---
+
+_w_format_status() {
+  local dirty="$1" count="$2"
+  if [[ "$dirty" == "true" ]]; then
+    local suffix="files changed"
+    [[ "$count" -eq 1 ]] && suffix="file changed"
+    printf '%s  %s' "$(_w_yellow "dirty")" "$(_w_dim "$count $suffix")"
+  else
+    _w_green "clean"
+  fi
+}
+
+_w_server_status_line() {
+  local name="$1" root="$2"
+  local ports_json
+  ports_json="$(_w_read_ports "$root")"
+  local entries
+  entries="$(printf '%s' "$ports_json" | jq -r --arg n "$name" '
+    .[$n].servers // {} | to_entries[] | "\(.value.port)\t\(.value.pid)"
+  ' 2>/dev/null)" || return 0
+  [[ -n "$entries" ]] || return 0
+  local live_ports=""
+  while IFS=$'\t' read -r port pid; do
+    if [[ -n "$pid" && -d "/proc/$pid" ]]; then
+      [[ -n "$live_ports" ]] && live_ports="$live_ports,"
+      live_ports="$live_ports:$port"
+    fi
+  done <<< "$entries"
+  [[ -n "$live_ports" ]] || return 0
+  printf '● server running %s' "$live_ports"
+}
+
+_w_server_status_block() {
+  local name="$1" root="$2"
+  local ports_json
+  ports_json="$(_w_read_ports "$root")"
+  local has_entry
+  has_entry="$(printf '%s' "$ports_json" | jq -r --arg n "$name" 'has($n) | tostring')"
+  [[ "$has_entry" == "true" ]] || return 0
+  # Output sorted server entries: name\tport\tpid\talive
+  printf '%s' "$ports_json" | jq -r --arg n "$name" '
+    .[$n].servers // {} | to_entries | sort_by(.key)[] |
+    "\(.key)\t\(.value.port)\t\(.value.pid)"
+  ' | while IFS=$'\t' read -r srv port pid; do
+    local alive="false"
+    if [[ -n "$pid" && -d "/proc/$pid" ]]; then
+      alive="true"
+    fi
+    printf '%s\t%s\t%s\t%s\n' "$srv" "$port" "$pid" "$alive"
+  done
+}
+
 # --- Subcommands ---
 
 _w_cmd_version() {
@@ -309,6 +380,129 @@ _w_cmd_run() {
     exit 1
   fi
   (cd "$path" && eval "$@")
+}
+
+_w_cmd_ls() {
+  local root
+  root="$(_w_find_root)"
+  local current_path
+  current_path="$(pwd)"
+
+  _w_parse_worktrees "$root" | while IFS=$'\t' read -r wt_path branch sha state; do
+    local name="${branch:-"(unknown)"}"
+    [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
+
+    local is_current="false"
+    [[ "$current_path" == "$wt_path"* ]] && is_current="true"
+
+    local marker=" "
+    local display_name="$name"
+    if [[ "$is_current" == "true" ]]; then
+      marker="$(_w_bold_green '*')"
+      display_name="$(_w_bold "$name")"
+    fi
+
+    local dirty="false"
+    local count=0
+    if _w_worktree_dirty "$wt_path"; then
+      dirty="true"
+      count="$(_w_worktree_dirty_count "$wt_path")"
+    fi
+    local status_str
+    status_str="$(_w_format_status "$dirty" "$count")"
+
+    local ab
+    ab="$(_w_worktree_ahead_behind "$wt_path")"
+    [[ -n "$ab" ]] && ab="$(_w_cyan "$ab")"
+
+    local srv_status
+    srv_status="$(_w_server_status_line "$name" "$root")"
+
+    # Build line: marker  name(padded)  status  [ahead/behind]  [server]
+    local line
+    line="$(printf '%s  %-15s  %s' "$marker" "$display_name" "$status_str")"
+    [[ -n "$ab" ]] && line="$line  $ab"
+    if [[ -n "$srv_status" ]]; then
+      local formatted_srv
+      formatted_srv="$(_w_green "●") ${srv_status#● }"
+      line="$line  $formatted_srv"
+    fi
+    echo "$line"
+  done
+}
+
+_w_cmd_status() {
+  local root
+  root="$(_w_find_root)"
+  local current_path
+  current_path="$(pwd)"
+  local proj
+  proj="$(_w_project_name "$root")"
+
+  # Count worktrees
+  local wt_data
+  wt_data="$(_w_parse_worktrees "$root")"
+  local wt_count
+  wt_count="$(echo "$wt_data" | wc -l | tr -d ' ')"
+  local plural="s"
+  [[ "$wt_count" -eq 1 ]] && plural=""
+
+  echo "$(_w_bold "$proj") — $wt_count worktree$plural"
+  echo ""
+
+  echo "$wt_data" | while IFS=$'\t' read -r wt_path branch sha state; do
+    local name="${branch:-"(unknown)"}"
+    [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
+
+    local is_current="false"
+    [[ "$current_path" == "$wt_path"* ]] && is_current="true"
+
+    local marker=" "
+    local display_name="$name"
+    if [[ "$is_current" == "true" ]]; then
+      marker="$(_w_bold_green '*')"
+      display_name="$(_w_bold "$name")"
+    fi
+
+    local dirty="false"
+    local count=0
+    if _w_worktree_dirty "$wt_path"; then
+      dirty="true"
+      count="$(_w_worktree_dirty_count "$wt_path")"
+    fi
+    local status_str
+    status_str="$(_w_format_status "$dirty" "$count")"
+
+    local ab
+    ab="$(_w_worktree_ahead_behind "$wt_path")"
+    [[ -n "$ab" ]] && ab="$(_w_cyan "$ab")"
+
+    local line
+    line="$(printf '%s  %-15s  %s' "$marker" "$display_name" "$status_str")"
+    [[ -n "$ab" ]] && line="$line  $ab"
+    echo "$line"
+
+    # Show server details
+    local srv_block
+    srv_block="$(_w_server_status_block "$name" "$root")"
+    if [[ -n "$srv_block" ]]; then
+      local total
+      total="$(echo "$srv_block" | wc -l)"
+      local i=0
+      echo "$srv_block" | while IFS=$'\t' read -r srv port pid alive; do
+        i=$((i + 1))
+        local connector="├"
+        [[ "$i" -eq "$total" ]] && connector="└"
+        local srv_status_str
+        if [[ "$alive" == "true" ]]; then
+          srv_status_str="$(_w_green "pid $pid")"
+        else
+          srv_status_str="$(_w_red "stopped")"
+        fi
+        echo "              $connector $srv  $(_w_cyan ":$port")  ($srv_status_str)"
+      done
+    fi
+  done
 }
 
 _w_cmd_help() {

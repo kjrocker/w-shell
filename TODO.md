@@ -58,13 +58,13 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 6. Subcommands: ls, status
 
-- [ ] `_w_cmd_ls` — for each worktree from `_w_parse_worktrees`: prints `marker  name  status  [ahead/behind]  [server]` where marker is `*` (bold green) if cwd is inside that worktree, name is left-padded to 15 chars
-- [ ] `_w_cmd_status` — prints bold project name + worktree count header, then per worktree same as ls, plus `_w_server_status_block` lines indented with `├`/`└` tree connectors
-- [ ] `_w_format_status dirty count` — prints yellow `dirty  N files changed` or green `clean`
-- [ ] `_w_server_status_line name root` — reads ports.json via jq, for each server where `/proc/$pid` exists collects `:port`, prints `● server running :3001,:8081` or empty
-- [ ] `_w_server_status_block name root` — reads ports.json, prints one line per server: `name  :port  (pid N)` or `(stopped)`, with green/red coloring on status
-- [ ] Tests: create temp ports.json with known PIDs (use `$$` for alive, 999999 for dead), verify status line/block output; verify ls column alignment with mocked worktree data
-- [ ] Tests pass
+- [x] `_w_cmd_ls` — for each worktree from `_w_parse_worktrees`: prints `marker  name  status  [ahead/behind]  [server]` where marker is `*` (bold green) if cwd is inside that worktree, name is left-padded to 15 chars
+- [x] `_w_cmd_status` — prints bold project name + worktree count header, then per worktree same as ls, plus `_w_server_status_block` lines indented with `├`/`└` tree connectors
+- [x] `_w_format_status dirty count` — prints yellow `dirty  N files changed` or green `clean`
+- [x] `_w_server_status_line name root` — reads ports.json via jq, for each server where `/proc/$pid` exists collects `:port`, prints `● server running :3001,:8081` or empty
+- [x] `_w_server_status_block name root` — reads ports.json, prints one line per server: `name  :port  (pid N)` or `(stopped)`, with green/red coloring on status
+- [x] Tests: create temp ports.json with known PIDs (use `$$` for alive, 999999 for dead), verify status line/block output; verify ls column alignment with mocked worktree data
+- [x] Tests pass
 
 ## 7. Subcommands: serve, stop, rm
 
