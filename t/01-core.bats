@@ -46,3 +46,33 @@ load helpers
   [ "$status" -eq 0 ]
   [[ "$output" == *"Usage:"* ]]
 }
+
+# --- Outside git repo ---
+
+@test "--help works outside git repo" {
+  cd /tmp
+  run "$W_BIN" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage:"* ]]
+}
+
+@test "--version works outside git repo" {
+  cd /tmp
+  run "$W_BIN" --version
+  [ "$status" -eq 0 ]
+  [[ "$output" == "w "* ]]
+}
+
+@test "no args shows help outside git repo" {
+  cd /tmp
+  run "$W_BIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage:"* ]]
+}
+
+@test "unknown command fails gracefully outside git repo" {
+  cd /tmp
+  run "$W_BIN" nonexistent
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Not inside a git repository"* ]]
+}

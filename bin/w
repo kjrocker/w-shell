@@ -614,15 +614,18 @@ EOF
 
 main() {
   local cmd="${1:-}"
+  # These work anywhere — no repo required
+  case "$cmd" in
+    --version) _w_cmd_version; return ;;
+    --help|"") _w_cmd_help; return ;;
+  esac
+  # Everything below requires a git repo
   case "$cmd" in
     init)      shift; _w_cmd_init "$@" ;;
     ls)        shift; _w_cmd_ls "$@" ;;
     rm)        shift; _w_cmd_rm "$@" ;;
     exit)      shift; _w_cmd_exit "$@" ;;
     status)    shift; _w_cmd_status "$@" ;;
-    --version) _w_cmd_version ;;
-    --help)    _w_cmd_help ;;
-    "")        _w_cmd_help ;;
     *)         _w_cmd_go "$@" ;;
   esac
 }
