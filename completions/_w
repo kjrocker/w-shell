@@ -11,6 +11,7 @@ _w_worktree_names() {
 _w() {
     local -a subcommands
     subcommands=(
+        'init:Create .wtconfig.toml in repo root'
         'ls:List all worktrees with status'
         'rm:Remove a worktree'
         'exit:Navigate to project root'
@@ -53,7 +54,7 @@ _w() {
                 _arguments '--only=[Stop only the named server]:server name'
             fi
             ;;
-        ls|exit|status)
+        init|ls|exit|status)
             # No further arguments
             ;;
         *)

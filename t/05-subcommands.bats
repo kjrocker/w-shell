@@ -10,6 +10,34 @@ load helpers
   [[ "$output" == "w "* ]]
 }
 
+# --- _w_cmd_init ---
+
+@test "init creates .wtconfig.toml in repo root" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  _w_cmd_init
+  [[ -f "$TEST_DIR/.wtconfig.toml" ]]
+  grep -q '\[setup\]' "$TEST_DIR/.wtconfig.toml"
+}
+
+@test "init fails if .wtconfig.toml already exists" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  touch "$TEST_DIR/.wtconfig.toml"
+  run _w_cmd_init
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"already exists"* ]]
+}
+
+@test "init from subdirectory writes to repo root" {
+  source "$W_BIN" --source-only
+  mkdir -p "$TEST_DIR/sub/dir"
+  cd "$TEST_DIR/sub/dir"
+  _w_cmd_init
+  [[ -f "$TEST_DIR/.wtconfig.toml" ]]
+  [[ ! -f "$TEST_DIR/sub/dir/.wtconfig.toml" ]]
+}
+
 # --- _w_cmd_exit ---
 
 @test "exit writes main worktree to cd-target" {

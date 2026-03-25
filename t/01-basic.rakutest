@@ -1,6 +1,0 @@
-use Test;
-use W::Raku;
-
-plan 1;
-
-ok True, 'module loads';

@@ -705,10 +705,28 @@ _w_cmd_rm() {
   echo "Done." >&2
 }
 
+_w_cmd_init() {
+  local root
+  root="$(_w_find_main_worktree)"
+  local cfg="$root/.wtconfig.toml"
+  if [[ -f "$cfg" ]]; then
+    echo ".wtconfig.toml already exists in $root" >&2
+    exit 1
+  fi
+  cat > "$cfg" <<'TOML'
+# path = "{parent}/{project}.{name}"
+
+[setup]
+commands = []
+TOML
+  echo "Created $cfg" >&2
+}
+
 _w_cmd_help() {
   cat >&2 <<'EOF'
 Usage: w <name>          Switch to (or create) worktree
        w <name> <cmd>    Run command in worktree
+       w init            Create .wtconfig.toml in repo root
        w ls              List worktrees
        w status          Project dashboard
        w rm <name>       Remove worktree
@@ -725,6 +743,7 @@ EOF
 main() {
   local cmd="${1:-}"
   case "$cmd" in
+    init)      shift; _w_cmd_init "$@" ;;
     ls)        shift; _w_cmd_ls "$@" ;;
     rm)        shift; _w_cmd_rm "$@" ;;
     exit)      shift; _w_cmd_exit "$@" ;;

@@ -31,7 +31,7 @@ _w_completions() {
   local cur prev subcmds
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
-  subcmds="ls rm exit status serve stop --version --help"
+  subcmds="init ls rm exit status serve stop --version --help"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
     # Complete subcommands + worktree names
@@ -60,7 +60,7 @@ _w_completions() {
         COMPREPLY=( $(compgen -W "--only" -- "$cur") )
       fi
       ;;
-    ls|exit|status)
+    init|ls|exit|status)
       ;;
     *)
       # w <name> <cmd...> — complete commands
