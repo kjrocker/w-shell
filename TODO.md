@@ -20,12 +20,12 @@ Rewrite w-raku from Raku to pure zsh/bash. Single-file `bin/w` with subcommands 
 
 ## 2. Worktree list and porcelain parsing
 
-- [ ] `_w_parse_worktrees root` — runs `git -C "$root" worktree list --porcelain`, pipes through awk to emit one tab-delimited line per worktree: `path\tbranch\tsha\tbare|detached|normal`; branch has `refs/heads/` stripped
-- [ ] `_w_worktree_dirty path` — exits 0 if `git -C "$path" status --porcelain` produces output, 1 otherwise
-- [ ] `_w_worktree_dirty_count path` — prints number of lines from `git -C "$path" status --porcelain` (0 if clean)
-- [ ] `_w_worktree_ahead_behind path` — runs `git -C "$path" rev-list --left-right --count HEAD...@{upstream}`, prints `[ahead N, behind M]` (omitting zero components), empty string if no upstream
-- [ ] Tests: feed canned porcelain strings to the awk parser, assert field extraction; create temp repo with staged+unstaged changes, verify dirty/count/ahead-behind
-- [ ] Tests pass
+- [x] `_w_parse_worktrees root` — runs `git -C "$root" worktree list --porcelain`, pipes through awk to emit one tab-delimited line per worktree: `path\tbranch\tsha\tbare|detached|normal`; branch has `refs/heads/` stripped
+- [x] `_w_worktree_dirty path` — exits 0 if `git -C "$path" status --porcelain` produces output, 1 otherwise
+- [x] `_w_worktree_dirty_count path` — prints number of lines from `git -C "$path" status --porcelain` (0 if clean)
+- [x] `_w_worktree_ahead_behind path` — runs `git -C "$path" rev-list --left-right --count HEAD...@{upstream}`, prints `[ahead N, behind M]` (omitting zero components), empty string if no upstream
+- [x] Tests: feed canned porcelain strings to the awk parser, assert field extraction; create temp repo with staged+unstaged changes, verify dirty/count/ahead-behind
+- [x] Tests pass
 
 ## 3. Config parsing (TOML)
 

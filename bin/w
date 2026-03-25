@@ -54,6 +54,66 @@ _w_cyan()       { _w_color '\e[36m' "$1"; }
 _w_dim()        { _w_color '\e[2m' "$1"; }
 _w_bold_green() { _w_color '\e[1m\e[32m' "$1"; }
 
+# --- Worktree parsing ---
+
+_w_parse_worktrees() {
+  local root="$1"
+  git -C "$root" worktree list --porcelain | awk '
+    /^worktree / { path = substr($0, 10) }
+    /^HEAD /     { sha = $2 }
+    /^branch /   { branch = $2; sub(/^refs\/heads\//, "", branch) }
+    /^bare$/     { state = "bare" }
+    /^detached$/ { state = "detached" }
+    /^$/         {
+      if (path != "") {
+        if (state == "") state = "normal"
+        if (branch == "") branch = ""
+        printf "%s\t%s\t%s\t%s\n", path, branch, sha, state
+        path = ""; branch = ""; sha = ""; state = ""
+      }
+    }
+    END {
+      if (path != "") {
+        if (state == "") state = "normal"
+        printf "%s\t%s\t%s\t%s\n", path, branch, sha, state
+      }
+    }
+  '
+}
+
+_w_worktree_dirty() {
+  local path="$1"
+  [[ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]]
+}
+
+_w_worktree_dirty_count() {
+  local path="$1"
+  local output
+  output="$(git -C "$path" status --porcelain 2>/dev/null)" || { echo 0; return; }
+  if [[ -z "$output" ]]; then
+    echo 0
+  else
+    echo "$output" | wc -l | tr -d ' '
+  fi
+}
+
+_w_worktree_ahead_behind() {
+  local path="$1"
+  local output
+  output="$(git -C "$path" rev-list --left-right --count HEAD...@{upstream} 2>/dev/null)" || { echo ""; return; }
+  local ahead behind
+  ahead="$(echo "$output" | awk '{print $1}')"
+  behind="$(echo "$output" | awk '{print $2}')"
+  local parts=()
+  [[ "$ahead" -gt 0 ]] 2>/dev/null && parts+=("ahead $ahead")
+  [[ "$behind" -gt 0 ]] 2>/dev/null && parts+=("behind $behind")
+  if [[ ${#parts[@]} -gt 0 ]]; then
+    local result
+    result="$(printf '%s, ' "${parts[@]}")"
+    printf '[%s]' "${result%, }"
+  fi
+}
+
 # --- Subcommands ---
 
 _w_cmd_version() {
