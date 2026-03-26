@@ -174,7 +174,7 @@ TOML
   project="$(_w_project_name "$root")"
   path="$parent/$project.setup-test"
   _w_create_worktree setup-test "$path" "$root"
-  _w_run_setup "$path" "$root"
+  _w_run_setup "$path" "$root" setup-test
   [[ -f "$path/setup-marker" ]]
 }
 
@@ -183,7 +183,26 @@ TOML
   cd "$TEST_DIR"
   local root
   root="$(_w_find_root)"
-  _w_run_setup "$TEST_DIR" "$root"
+  _w_run_setup "$TEST_DIR" "$root" test
+}
+
+@test "run_setup exposes W_ROOT and W_WORKTREE" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local root
+  root="$(_w_find_root)"
+  cat > "$root/.wtconfig.toml" <<'TOML'
+[setup]
+commands = ["echo $W_ROOT > env-marker", "echo $W_WORKTREE >> env-marker"]
+TOML
+  local parent project path
+  parent="$(_w_parent_dir "$root")"
+  project="$(_w_project_name "$root")"
+  path="$parent/$project.setup-env"
+  _w_create_worktree setup-env "$path" "$root"
+  _w_run_setup "$path" "$root" setup-env
+  [[ "$(sed -n '1p' "$path/env-marker")" == "$root" ]]
+  [[ "$(sed -n '2p' "$path/env-marker")" == "setup-env" ]]
 }
 
 # --- _w_cmd_run ---

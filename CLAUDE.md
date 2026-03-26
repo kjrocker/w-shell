@@ -8,7 +8,7 @@ Git worktree manager. Handles worktree create/navigate/list/remove, setup orches
 # Run the CLI
 bin/w --help
 
-# Run all tests
+# Run all tests (requires sandbox disabled — bats needs /tmp/claude to exist)
 bats t/
 
 # Run a single test

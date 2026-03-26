@@ -274,14 +274,14 @@ _w_create_worktree() {
 }
 
 _w_run_setup() {
-  local path="$1" root="$2"
+  local path="$1" root="$2" name="$3"
   local commands
   commands="$(_w_config_get "$root" '.setup.commands[]' 2>/dev/null)" || return 0
   [[ -z "$commands" || "$commands" == "null" ]] && return 0
   while IFS= read -r cmd; do
     [[ -z "$cmd" ]] && continue
     echo "Running setup: $cmd" >&2
-    if ! (cd "$path" && eval "$cmd"); then
+    if ! (cd "$path" && W_ROOT="$root" W_WORKTREE="$name" eval "$cmd"); then
       echo "Warning: setup command '$cmd' failed" >&2
     fi
   done <<< "$commands"
@@ -368,7 +368,7 @@ _w_cmd_go() {
     echo "Creating worktree $name..." >&2
     _w_create_worktree "$name" "$path" "$root"
     _w_slot_assign "$name" "$root" > /dev/null
-    _w_run_setup "$path" "$root"
+    _w_run_setup "$path" "$root" "$name"
   fi
 
   local slot
@@ -392,7 +392,7 @@ _w_cmd_run() {
   local slot
   slot="$(_w_slot_get "$name" "$root")"
   [[ -z "$slot" ]] && slot=0
-  local env_args=("W_WORKTREE=$name" "W_PROJECT=$(_w_project_name "$root")")
+  local env_args=("W_WORKTREE=$name" "W_ROOT=$root" "W_PROJECT=$(_w_project_name "$root")")
   local env_lines
   env_lines="$(_w_build_env "$root" "$name" "$slot")"
   if [[ -n "$env_lines" ]]; then
@@ -574,16 +574,17 @@ _w_cmd_init() {
   fi
   cat > "$cfg" <<'TOML'
 # Worktree directory layout (default: sibling directories)
-# path = "{parent}/{project}.{name}"
-#
 # Available tokens: {project}, {name}, {parent}, {home}
 # Examples:
 #   "{parent}/{project}.worktrees/{name}"  — subdirectory of project
 #   "{home}/worktrees/{project}/{name}"    — global worktree directory
+path = "{parent}/{project}.{name}"
 
+# Setup commands run in the worktree directory after creation.
+# Available env vars: $W_ROOT (base repo path), $W_WORKTREE (branch name).
 [setup]
 commands = []
-# commands = ["npm install", "cp .env.example .env"]
+# commands = ["npm install", "cp $W_ROOT/.env .env"]
 
 # Environment variables exported into the worktree subshell.
 # Use {base:N} for port allocation (N + worktree slot).

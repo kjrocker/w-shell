@@ -116,7 +116,7 @@ NODE_ENV = "development"
 **`path`** — worktree directory template (see [Worktree path template](#worktree-path-template)). Optional; defaults to `{parent}/{project}.{name}`.
 
 **`[setup]`**
-- `commands` — list of shell commands run sequentially in the new worktree directory after creation. If any command fails, the worktree is still created but a warning is printed.
+- `commands` — list of shell commands run sequentially in the new worktree directory after creation. If any command fails, the worktree is still created but a warning is printed. Each command has access to `W_ROOT` (base repo path) and `W_WORKTREE` (branch name), enabling copy operations like `cp "$W_ROOT/.env" .env`.
 
 **`[env]`** — key-value pairs exported into the worktree subshell and into commands run via `w <name> <cmd>`.
 - Values support template substitution:
