@@ -2,12 +2,10 @@
 
 Git worktree manager. Create, navigate, list, and remove worktrees. Optionally orchestrate setup commands and dev servers with automatic port allocation via `.wtconfig.toml`.
 
-Originally a Raku tool, now rewritten as a pure-shell (bash) implementation.
-
 ## Dependencies
 
 - `jq` — JSON state files
-- `yq` — TOML config parsing ([mikefarah/yq](https://github.com/mikefarah/yq), Go binary)
+- `yq` — TOML config parsing
 - `bats-core` — tests only
 
 ## Install
@@ -22,7 +20,7 @@ source /path/to/w/w.zsh
 source /path/to/w/w.bash
 ```
 
-The wrapper defines a `w` function that calls `bin/w` and handles directory changes. Zsh completions are in `completions/_w`.
+The wrapper defines a `w` function that calls `bin/w`. Zsh completions are in `completions/_w`.
 
 ## Usage
 
@@ -33,9 +31,7 @@ w init            Create a .wtconfig.toml in the repo root
 w ls              List worktrees
 w status          Project dashboard
 w rm <name>       Remove worktree
-w exit            Return to main worktree
-w serve [name]    Start dev servers
-w stop [name]     Stop dev servers
+w exit            Hint to type 'exit' to leave subshell
 ```
 
 ## Config
@@ -46,13 +42,12 @@ Optional `.wtconfig.toml` in the repo root:
 path = "{parent}/{project}.{name}"
 
 [setup]
-commands = ["npm install", "cp .env.example .env"]
+commands = ["npm install", "cp $W_ROOT/.env .env"]
 
-[[server]]
-name = "frontend"
-command = "npm run dev"
-port-env = "PORT"
-base-port = 3000
+[env]
+PORT = "{base:3000}"
+API_PORT = "{base:8080}"
+DATABASE_URL = "postgres://localhost/myapp_{name}"
 ```
 
 See [SPEC.md](SPEC.md) for full documentation.

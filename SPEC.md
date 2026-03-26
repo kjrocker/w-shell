@@ -16,7 +16,7 @@ w() {
 
 Source `w.bash` (or `w.zsh`) in your shell config to register the wrapper and completions.
 
-All user-facing output goes to stderr; stdout is reserved for data output (`ls`, `status`).
+Progress and informational messages go to stderr. Data output (`ls`, `status`) goes to stdout so it can be piped or captured.
 
 ## Subcommands
 
@@ -172,9 +172,9 @@ Actual ports are computed as `base-port + slot`. With the config above:
 | feat-x | 1 | 3001 | 8081 |
 | bugfix-y | 2 | 3002 | 8082 |
 
-Slots are recorded in `~/.local/state/w/projects/<project-id>/slots.json`. When a worktree is removed, its slot is freed and can be reused.
+Slot assignments are stored in `~/.local/state/w/projects/<project-id>/slots.json`. When a worktree is removed, its slot is freed and can be reused. `<project-id>` is derived from the repo root path.
 
-Port values are injected into the subshell (or one-off command) as environment variables. There is no separate server management — users run their own dev servers inside the subshell, where `PORT` etc. are already set.
+Port values are injected into the subshell (or one-off command) as environment variables.
 
 ## Subshell environment
 
@@ -189,7 +189,7 @@ When `w <name>` spawns a subshell, the following environment variables are set:
 
 `W_WORKTREE` also serves as the nesting guard — if it's already set, `w` refuses to spawn another subshell.
 
-The shell is determined by `$SHELL` (falling back to `/bin/bash`). No rcfile customization is performed — the user's normal shell config loads as usual. Users can check `$W_WORKTREE` in their prompt if desired.
+The shell is determined by `$SHELL` (falling back to `/bin/bash`). The user's normal shell config loads as usual. 
 
 ## Repo layout
 
@@ -202,27 +202,8 @@ w/
 └── t/                            # Tests (bats)
 ```
 
-## Parsing
-
-- **Git porcelain** — `git worktree list --porcelain` is parsed with `awk`. The format is line-oriented key-value pairs separated by blank lines — no grammar needed.
-- **TOML config** — `.wtconfig.toml` is parsed with `yq` ([mikefarah/yq](https://github.com/mikefarah/yq), Go binary). Reads TOML natively: `yq -oy '.path' .wtconfig.toml`.
-- **JSON state** — `slots.json` is read/written with `jq`.
-
 ## Dependencies
 
-- `jq` — JSON read/write for state files
+- `jq` — JSON read/write for slot state
 - `yq` — TOML parsing for .wtconfig.toml ([mikefarah/yq](https://github.com/mikefarah/yq))
 - `bats-core` — test framework
-
-## Runtime state
-
-All state lives under `~/.local/state/w/`:
-
-```
-~/.local/state/w/
-└── projects/
-    └── <project-id>/
-        └── slots.json                     # slot assignments: { "feat-x": 1, "bugfix-y": 2 }
-```
-
-`<project-id>` is derived from the repo root path (e.g., a sanitized absolute path or a hash). This keeps state per-project without collisions.
