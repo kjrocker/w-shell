@@ -115,6 +115,21 @@ TOML
   [[ "$result" == *"PORT=3000"* ]]
 }
 
+@test "ls works from inside a worktree subshell" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" feat-wt-ls)"
+  _w_create_worktree feat-wt-ls "$path" "$root"
+  _w_slot_assign feat-wt-ls "$root" > /dev/null
+  cd "$path"
+  local result
+  result="$(_w_cmd_ls)"
+  [[ "$result" == *"main"* ]]
+  [[ "$result" == *"feat-wt-ls"* ]]
+}
+
 # --- _w_cmd_status ---
 
 @test "status shows project header with worktree count" {
@@ -135,6 +150,29 @@ TOML
   result="$(_w_cmd_status)"
   [[ "$result" == *"main"* ]]
   [[ "$result" == *"clean"* ]]
+}
+
+@test "status works from inside a worktree subshell" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local root path
+  root="$(_w_find_root)"
+  path="$(_w_resolve_path "$root" feat-wt-status)"
+  _w_create_worktree feat-wt-status "$path" "$root"
+  _w_slot_assign feat-wt-status "$root" > /dev/null
+  cd "$path"
+  local result
+  result="$(_w_cmd_status)"
+  [[ "$result" == *"main"* ]]
+  [[ "$result" == *"feat-wt-status"* ]]
+}
+
+@test "status shows worktree paths" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local result
+  result="$(_w_cmd_status)"
+  [[ "$result" == *"$TEST_DIR"* ]]
 }
 
 @test "status shows env vars when configured" {

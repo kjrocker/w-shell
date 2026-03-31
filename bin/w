@@ -405,11 +405,16 @@ _w_cmd_run() {
 
 _w_cmd_ls() {
   local root
-  root="$(_w_find_root)"
+  root="$(_w_find_main_worktree)"
   local current_path
   current_path="$(pwd)"
 
-  _w_parse_worktrees "$root" | while IFS=$'\t' read -r wt_path branch sha state; do
+  local wt_data
+  wt_data="$(_w_parse_worktrees "$root")"
+  local name_width
+  name_width="$(echo "$wt_data" | awk -F'\t' '{ n = $2; if (n == "" || ($4 == "detached" && n == "")) n = "(detached)"; if (length(n) > max) max = length(n) } END { print (max < 4 ? 4 : max) }')"
+
+  echo "$wt_data" | while IFS=$'\t' read -r wt_path branch sha state; do
     local name="${branch:-"(unknown)"}"
     [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
 
@@ -441,7 +446,7 @@ _w_cmd_ls() {
 
     # Build line: marker  name(padded)  status  [ahead/behind]  [env]
     local line
-    line="$(printf '%s  %-15s  %s' "$marker" "$display_name" "$status_str")"
+    line="$(printf "%s  %-${name_width}s  %s" "$marker" "$display_name" "$status_str")"
     [[ -n "$ab" ]] && line="$line  $ab"
     [[ -n "$env_status" ]] && line="$line  $(_w_dim "$env_status")"
     echo "$line"
@@ -450,7 +455,7 @@ _w_cmd_ls() {
 
 _w_cmd_status() {
   local root
-  root="$(_w_find_root)"
+  root="$(_w_find_main_worktree)"
   local current_path
   current_path="$(pwd)"
   local proj
@@ -466,6 +471,11 @@ _w_cmd_status() {
 
   echo "$(_w_bold "$proj") — $wt_count worktree$plural"
   echo ""
+
+  local name_width
+  name_width="$(echo "$wt_data" | awk -F'\t' '{ n = $2; if (n == "" || ($4 == "detached" && n == "")) n = "(detached)"; if (length(n) > max) max = length(n) } END { print (max < 4 ? 4 : max) }')"
+  local indent
+  indent="$(printf '%*s' "$((name_width + 4))" '')"
 
   echo "$wt_data" | while IFS=$'\t' read -r wt_path branch sha state; do
     local name="${branch:-"(unknown)"}"
@@ -498,14 +508,14 @@ _w_cmd_status() {
     env_status="$(_w_env_status_line "$name" "$root")"
 
     local line
-    line="$(printf '%s  %-15s  %s' "$marker" "$display_name" "$status_str")"
+    line="$(printf "%s  %-${name_width}s  %s" "$marker" "$display_name" "$status_str")"
     [[ -n "$ab" ]] && line="$line  $ab"
     echo "$line"
 
-    # Show env var details
-    if [[ -n "$env_status" ]]; then
-      echo "              $(_w_dim "$env_status")"
-    fi
+    # Show path and env var details
+    local detail="$(_w_dim "$wt_path")"
+    [[ -n "$env_status" ]] && detail="$detail  $(_w_dim "$env_status")"
+    echo "${indent}${detail}"
   done
 }
 
