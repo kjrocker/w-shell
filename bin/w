@@ -411,9 +411,13 @@ _w_cmd_ls() {
 
   local wt_data
   wt_data="$(_w_parse_worktrees "$root")"
+  # name_width accounts for " (main)" suffix on the first entry
   local name_width
-  name_width="$(echo "$wt_data" | awk -F'\t' '{ n = $2; if (n == "" || ($4 == "detached" && n == "")) n = "(detached)"; if (length(n) > max) max = length(n) } END { print (max < 4 ? 4 : max) }')"
+  name_width="$(echo "$wt_data" | awk -F'\t' 'NR==1 { n = $2; if (n == "") n = "(unknown)"; n = n " (main)"; if (length(n) > max) max = length(n) }
+    NR>1 { n = $2; if (n == "" || ($4 == "detached" && n == "")) n = "(detached)"; if (length(n) > max) max = length(n) }
+    END { print (max < 4 ? 4 : max) }')"
 
+  local is_first="true"
   echo "$wt_data" | while IFS=$'\t' read -r wt_path branch sha state; do
     local name="${branch:-"(unknown)"}"
     [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
@@ -423,9 +427,15 @@ _w_cmd_ls() {
 
     local marker=" "
     local display_name="$name"
+    local visible_name="$name"
     if [[ "$is_current" == "true" ]]; then
       marker="$(_w_bold_green '*')"
       display_name="$(_w_bold "$name")"
+    fi
+    if [[ "$is_first" == "true" ]]; then
+      display_name="$display_name $(_w_dim "(main)")"
+      visible_name="$name (main)"
+      is_first="false"
     fi
 
     local dirty="false"
@@ -444,9 +454,15 @@ _w_cmd_ls() {
     local env_status
     env_status="$(_w_env_status_line "$name" "$root")"
 
+    # Pad based on visible name length, not colored string length
+    local pad=$(( name_width - ${#visible_name} ))
+    [[ $pad -lt 0 ]] && pad=0
+    local padding
+    padding="$(printf '%*s' "$pad" '')"
+
     # Build line: marker  name(padded)  status  [ahead/behind]  [env]
     local line
-    line="$(printf "%s  %-${name_width}s  %s" "$marker" "$display_name" "$status_str")"
+    line="$(printf "%s  %s%s  %s" "$marker" "$display_name" "$padding" "$status_str")"
     [[ -n "$ab" ]] && line="$line  $ab"
     [[ -n "$env_status" ]] && line="$line  $(_w_dim "$env_status")"
     echo "$line"
@@ -472,11 +488,14 @@ _w_cmd_status() {
   echo "$(_w_bold "$proj") — $wt_count worktree$plural"
   echo ""
 
+  # name_width accounts for " (main)" suffix on the first entry
   local name_width
-  name_width="$(echo "$wt_data" | awk -F'\t' '{ n = $2; if (n == "" || ($4 == "detached" && n == "")) n = "(detached)"; if (length(n) > max) max = length(n) } END { print (max < 4 ? 4 : max) }')"
-  local indent
-  indent="$(printf '%*s' "$((name_width + 4))" '')"
+  name_width="$(echo "$wt_data" | awk -F'\t' 'NR==1 { n = $2; if (n == "") n = "(unknown)"; n = n " (main)"; if (length(n) > max) max = length(n) }
+    NR>1 { n = $2; if (n == "" || ($4 == "detached" && n == "")) n = "(detached)"; if (length(n) > max) max = length(n) }
+    END { print (max < 4 ? 4 : max) }')"
+  local indent="   "
 
+  local is_first="true"
   echo "$wt_data" | while IFS=$'\t' read -r wt_path branch sha state; do
     local name="${branch:-"(unknown)"}"
     [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
@@ -486,9 +505,15 @@ _w_cmd_status() {
 
     local marker=" "
     local display_name="$name"
+    local visible_name="$name"
     if [[ "$is_current" == "true" ]]; then
       marker="$(_w_bold_green '*')"
       display_name="$(_w_bold "$name")"
+    fi
+    if [[ "$is_first" == "true" ]]; then
+      display_name="$display_name $(_w_dim "(main)")"
+      visible_name="$name (main)"
+      is_first="false"
     fi
 
     local dirty="false"
@@ -507,15 +532,31 @@ _w_cmd_status() {
     local env_status
     env_status="$(_w_env_status_line "$name" "$root")"
 
+    # Pad based on visible name length, not colored string length
+    local pad=$(( name_width - ${#visible_name} ))
+    [[ $pad -lt 0 ]] && pad=0
+    local padding
+    padding="$(printf '%*s' "$pad" '')"
+
     local line
-    line="$(printf "%s  %-${name_width}s  %s" "$marker" "$display_name" "$status_str")"
+    line="$(printf "%s  %s%s  %s" "$marker" "$display_name" "$padding" "$status_str")"
     [[ -n "$ab" ]] && line="$line  $ab"
     echo "$line"
 
-    # Show path and env var details
-    local detail="$(_w_dim "$wt_path")"
-    [[ -n "$env_status" ]] && detail="$detail  $(_w_dim "$env_status")"
-    echo "${indent}${detail}"
+    # Show path
+    echo "${indent}$(_w_dim "$wt_path")"
+
+    # Show env vars on individual lines
+    if [[ -n "$env_status" ]]; then
+      local env_lines_raw
+      env_lines_raw="$(_w_build_env "$root" "$name" "$(_w_slot_get "$name" "$root")")" || env_lines_raw=""
+      if [[ -n "$env_lines_raw" ]]; then
+        while IFS='=' read -r key val; do
+          echo "${indent}$(_w_dim "$key=$val")"
+        done <<< "$env_lines_raw"
+      fi
+    fi
+    echo ""
   done
 }
 

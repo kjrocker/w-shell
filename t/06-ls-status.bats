@@ -77,6 +77,14 @@ TOML
   [[ "$result" == *"clean"* ]]
 }
 
+@test "ls labels the main worktree" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local result
+  result="$(_w_cmd_ls)"
+  [[ "$result" == *"(main)"* ]]
+}
+
 @test "ls shows dirty status for modified worktree" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
@@ -150,6 +158,14 @@ TOML
   result="$(_w_cmd_status)"
   [[ "$result" == *"main"* ]]
   [[ "$result" == *"clean"* ]]
+}
+
+@test "status labels the main worktree" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local result
+  result="$(_w_cmd_status)"
+  [[ "$result" == *"(main)"* ]]
 }
 
 @test "status works from inside a worktree subshell" {

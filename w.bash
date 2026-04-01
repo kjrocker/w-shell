@@ -2,10 +2,10 @@
 # Source this file in your .bashrc:
 #   source /path/to/w/w.bash
 
-W_ROOT="${W_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+_W_INSTALL_DIR="${_W_INSTALL_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 w() {
-  "$W_ROOT/bin/w" "$@"
+  "$_W_INSTALL_DIR/bin/w" "$@"
 }
 
 _w_completions() {

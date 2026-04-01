@@ -7,9 +7,9 @@ load helpers
 @test "bash wrapper: w function calls bin/w" {
   local result
   result="$(
-    export W_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    local w_dir="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     export W_STATE_DIR="$W_STATE_DIR"
-    source "$W_ROOT/w.bash"
+    source "$w_dir/w.bash"
     cd "$TEST_DIR"
     w --version
   )"
@@ -57,8 +57,8 @@ load helpers
 @test "bash completion function is defined after sourcing" {
   local result
   result="$(
-    export W_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    source "$W_ROOT/w.bash"
+    local w_dir="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    source "$w_dir/w.bash"
     type -t _w_completions
   )"
   [[ "$result" == "function" ]]
