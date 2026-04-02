@@ -31,7 +31,7 @@ _w() {
             if (( CURRENT == 3 )); then
                 _w_worktree_names
             else
-                _arguments '--force[Force removal even with unmerged commits]'
+                _arguments '(-f --force)'{-f,--force}'[Force removal even with unmerged commits]'
             fi
             ;;
         init|ls|exit|status)

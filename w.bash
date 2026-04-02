@@ -29,7 +29,7 @@ _w_completions() {
         worktrees="$(git worktree list --porcelain 2>/dev/null | grep '^branch ' | sed 's|^branch refs/heads/||')"
         COMPREPLY=( $(compgen -W "$worktrees" -- "$cur") )
       else
-        COMPREPLY=( $(compgen -W "--force" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--force -f" -- "$cur") )
       fi
       ;;
     init|ls|exit|status)

@@ -86,6 +86,18 @@ TOML
   [[ "$result" == "NODE_ENV=development" ]]
 }
 
+@test "build_env interpolates {base:N} inside compound values" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+DATABASE_URL = "postgres://localhost:{base:5432}/myapp"
+TOML
+  local result
+  result="$(_w_build_env "$TEST_DIR" "feat-x" "2")"
+  [[ "$result" == "DATABASE_URL=postgres://localhost:5434/myapp" ]]
+}
+
 @test "build_env handles multiple env vars" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"

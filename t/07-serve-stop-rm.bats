@@ -50,6 +50,24 @@ load helpers
   [[ -z "$slot" ]]
 }
 
+@test "rm with -f flag removes branch with unmerged commits" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local root
+  root="$(_w_find_root)"
+
+  local wt_path
+  wt_path="$(_w_resolve_path "$root" "feat-rm-shortflag")"
+  _w_create_worktree feat-rm-shortflag "$wt_path" "$root"
+  _w_slot_assign feat-rm-shortflag "$root" > /dev/null
+  git -C "$wt_path" -c user.email=test@test.com -c user.name=Test commit --allow-empty -m "unmerged" --quiet
+
+  cd "$TEST_DIR"
+  _w_cmd_rm "feat-rm-shortflag" -f 2>/dev/null
+
+  [[ ! -d "$wt_path" ]]
+}
+
 @test "rm refuses when inside the target subshell" {
   run bash -c "
     export W_STATE_DIR='$W_STATE_DIR' W_WORKTREE=feat-active NO_COLOR=1
