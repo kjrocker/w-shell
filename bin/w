@@ -32,16 +32,12 @@ _w_spawn_subshell() {
     echo "Already in worktree '$W_WORKTREE'. Type 'exit' to leave first." >&2
     return 1
   fi
-  local env_args=()
-  local env_lines
-  env_lines="$(_w_build_env "$root" "$name" "$slot")"
-  if [[ -n "$env_lines" ]]; then
-    while IFS='=' read -r key val; do
-      env_args+=("$key=$val")
-    done <<< "$env_lines"
-  fi
-  env_args+=("W_WORKTREE=$name" "W_PROJECT=$(_w_project_name "$root")" "W_ROOT=$root")
-  cd "$path" && exec env "${env_args[@]}" "${SHELL:-/bin/bash}"
+  local shell="${SHELL:-/bin/bash}"
+  cd "$path" && exec env \
+    "W_WORKTREE=$name" \
+    "W_PROJECT=$(_w_project_name "$root")" \
+    "W_ROOT=$root" \
+    bash -c '[ -f .ports ] && . ./.ports; exec "$@"' _ "$shell"
 }
 
 # --- Color helpers ---
@@ -178,6 +174,61 @@ _w_build_env() {
     val="${val//\{project\}/$project}"
     printf '%s=%s\n' "$key" "$val"
   done
+}
+
+# --- Ports file ---
+
+_w_ports_file() {
+  printf '%s' "$1/.ports"
+}
+
+_w_write_ports() {
+  local path="$1" root="$2" name="$3" slot="$4"
+  local file
+  file="$(_w_ports_file "$path")"
+  local env_lines
+  env_lines="$(_w_build_env "$root" "$name" "$slot")"
+  if [[ -z "$env_lines" ]]; then
+    [[ -f "$file" ]] && rm -f "$file"
+    return 0
+  fi
+  local tmp="$file.tmp"
+  : > "$tmp"
+  while IFS='=' read -r key val; do
+    [[ -z "$key" ]] && continue
+    printf 'export %s=%q\n' "$key" "$val" >> "$tmp"
+  done <<< "$env_lines"
+  mv "$tmp" "$file"
+}
+
+_w_read_ports() {
+  local path="$1"
+  local file
+  file="$(_w_ports_file "$path")"
+  [[ -f "$file" ]] || return 0
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    line="${line#export }"
+    local key="${line%%=*}"
+    local val_quoted="${line#*=}"
+    local val
+    eval "val=$val_quoted"
+    printf '%s=%s\n' "$key" "$val"
+  done < "$file"
+}
+
+_w_ensure_gitignore_ports() {
+  local root="$1"
+  local gi="$root/.gitignore"
+  if [[ -f "$gi" ]]; then
+    grep -qxF '.ports' "$gi" && return 0
+    if [[ -n "$(tail -c1 "$gi" 2>/dev/null)" ]]; then
+      printf '\n' >> "$gi"
+    fi
+    printf '.ports\n' >> "$gi"
+  else
+    printf '.ports\n' > "$gi"
+  fi
 }
 
 # --- Slot allocation ---
@@ -317,18 +368,10 @@ _w_format_status() {
 }
 
 _w_env_status_line() {
-  local name="$1" root="$2"
-  local slot
-  if [[ "$name" == "main" ]]; then
-    slot=0
-  else
-    slot="$(_w_slot_get "$name" "$root")"
-    [[ -z "$slot" ]] && return 0
-  fi
+  local wt_path="$1"
   local env_lines
-  env_lines="$(_w_build_env "$root" "$name" "$slot")" || return 0
+  env_lines="$(_w_read_ports "$wt_path")"
   [[ -z "$env_lines" ]] && return 0
-  # Show compact KEY=val pairs
   local parts=""
   while IFS='=' read -r key val; do
     [[ -n "$parts" ]] && parts="$parts "
@@ -370,11 +413,14 @@ _w_cmd_go() {
     _w_create_worktree "$name" "$path" "$root"
     _w_slot_assign "$name" "$root" > /dev/null
     _w_run_setup "$path" "$root" "$name"
+    _w_ensure_gitignore_ports "$root"
   fi
 
   local slot
   slot="$(_w_slot_get "$name" "$root")"
   [[ -z "$slot" ]] && slot=0
+
+  _w_write_ports "$path" "$root" "$name" "$slot"
 
   echo "→ $path" >&2
   _w_spawn_subshell "$path" "$root" "$name" "$slot"
@@ -393,15 +439,12 @@ _w_cmd_run() {
   local slot
   slot="$(_w_slot_get "$name" "$root")"
   [[ -z "$slot" ]] && slot=0
-  local env_args=("W_WORKTREE=$name" "W_ROOT=$root" "W_PROJECT=$(_w_project_name "$root")")
-  local env_lines
-  env_lines="$(_w_build_env "$root" "$name" "$slot")"
-  if [[ -n "$env_lines" ]]; then
-    while IFS='=' read -r key val; do
-      env_args+=("$key=$val")
-    done <<< "$env_lines"
-  fi
-  (cd "$path" && env "${env_args[@]}" bash -c "$*")
+  _w_write_ports "$path" "$root" "$name" "$slot"
+  (cd "$path" && env \
+    "W_WORKTREE=$name" \
+    "W_PROJECT=$(_w_project_name "$root")" \
+    "W_ROOT=$root" \
+    bash -c "[ -f .ports ] && . ./.ports; $*")
 }
 
 _w_cmd_ls() {
@@ -422,6 +465,11 @@ _w_cmd_ls() {
   echo "$wt_data" | while IFS=$'\t' read -r wt_path branch sha state; do
     local name="${branch:-"(unknown)"}"
     [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
+
+    local wt_slot
+    wt_slot="$(_w_slot_get "$name" "$root")"
+    [[ -z "$wt_slot" ]] && wt_slot=0
+    _w_write_ports "$wt_path" "$root" "$name" "$wt_slot"
 
     local is_current="false"
     [[ "$current_path" == "$wt_path"* ]] && is_current="true"
@@ -453,7 +501,7 @@ _w_cmd_ls() {
     [[ -n "$ab" ]] && ab="$(_w_cyan "$ab")"
 
     local env_status
-    env_status="$(_w_env_status_line "$name" "$root")"
+    env_status="$(_w_env_status_line "$wt_path")"
 
     # Pad based on visible name length, not colored string length
     local pad=$(( name_width - ${#visible_name} ))
@@ -501,6 +549,11 @@ _w_cmd_status() {
     local name="${branch:-"(unknown)"}"
     [[ "$state" == "detached" && -z "$branch" ]] && name="(detached)"
 
+    local wt_slot
+    wt_slot="$(_w_slot_get "$name" "$root")"
+    [[ -z "$wt_slot" ]] && wt_slot=0
+    _w_write_ports "$wt_path" "$root" "$name" "$wt_slot"
+
     local is_current="false"
     [[ "$current_path" == "$wt_path"* ]] && is_current="true"
 
@@ -531,7 +584,7 @@ _w_cmd_status() {
     [[ -n "$ab" ]] && ab="$(_w_cyan "$ab")"
 
     local env_status
-    env_status="$(_w_env_status_line "$name" "$root")"
+    env_status="$(_w_env_status_line "$wt_path")"
 
     # Pad based on visible name length, not colored string length
     local pad=$(( name_width - ${#visible_name} ))
@@ -550,7 +603,7 @@ _w_cmd_status() {
     # Show env vars on individual lines
     if [[ -n "$env_status" ]]; then
       local env_lines_raw
-      env_lines_raw="$(_w_build_env "$root" "$name" "$(_w_slot_get "$name" "$root")")" || env_lines_raw=""
+      env_lines_raw="$(_w_read_ports "$wt_path")"
       if [[ -n "$env_lines_raw" ]]; then
         while IFS='=' read -r key val; do
           echo "${indent}$(_w_dim "$key=$val")"
@@ -645,6 +698,7 @@ commands = []
 # API_PORT = "{base:8080}"
 # DATABASE_URL = "postgres://localhost/myapp_{name}"
 TOML
+  _w_ensure_gitignore_ports "$root"
   echo "Created $cfg" >&2
 }
 

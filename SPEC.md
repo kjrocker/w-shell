@@ -174,7 +174,17 @@ Actual ports are computed as `base-port + slot`. With the config above:
 
 Slot assignments are stored in `~/.local/state/w/projects/<project-id>/slots.json`. When a worktree is removed, its slot is freed and can be reused. `<project-id>` is derived from the repo root path.
 
-Port values are injected into the subshell (or one-off command) as environment variables.
+Port values are written to a `.ports` file in each worktree and loaded into the subshell (or one-off command) by sourcing that file.
+
+### `.ports` file
+
+Each worktree's computed env vars are materialized as `<worktree>/.ports` — a shell-sourceable file of `export KEY=value` lines (values are quoted with `printf %q` for safety).
+
+- **Regenerated on every `w` invocation** (`w <name>`, `w <name> <cmd>`, `w ls`, `w status`). The file is always the current truth at read time.
+- **Sourced at subshell entry and before `w <name> <cmd>` runs**, so it is also what populates the runtime environment — the display layer and the runtime agree by construction.
+- **Removed if `[env]` is absent**: if config has no `[env]` section, a stale `.ports` is deleted rather than left behind.
+- **Auto-added to `.gitignore`** in the main worktree on the first `w <name>` creation and at `w init` time.
+- **Inspectable directly**: `cat .ports` from inside a worktree, or `source .ports` from external tooling that wants the same env without going through `w`.
 
 ## Subshell environment
 

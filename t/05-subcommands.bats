@@ -115,6 +115,37 @@ TOML
   [[ "$output" == *"PORT=3001"* ]]
 }
 
+@test "go writes .ports file in worktree" {
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+PORT = "{base:3000}"
+TOML
+  bash -c "
+    export W_STATE_DIR='$W_STATE_DIR' SHELL=/usr/bin/env NO_COLOR=1
+    source '$W_BIN' --source-only 2>/dev/null
+    cd '$TEST_DIR'
+    _w_cmd_go feat-ports-file 2>/dev/null >/dev/null
+  "
+  source "$W_BIN" --source-only
+  local path
+  path="$(_w_resolve_path "$TEST_DIR" feat-ports-file)"
+  [[ -f "$path/.ports" ]]
+  grep -q '^export PORT=3001$' "$path/.ports"
+}
+
+@test "go adds .ports to root .gitignore on first creation" {
+  cd "$TEST_DIR"
+  bash -c "
+    export W_STATE_DIR='$W_STATE_DIR' SHELL=/usr/bin/env NO_COLOR=1
+    source '$W_BIN' --source-only 2>/dev/null
+    cd '$TEST_DIR'
+    _w_cmd_go feat-gi 2>/dev/null >/dev/null
+  "
+  [[ -f "$TEST_DIR/.gitignore" ]]
+  grep -qxF '.ports' "$TEST_DIR/.gitignore"
+}
+
 @test "go refuses when already in subshell" {
   run bash -c "
     export W_STATE_DIR='$W_STATE_DIR' W_WORKTREE=existing SHELL=/usr/bin/env NO_COLOR=1

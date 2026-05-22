@@ -28,28 +28,29 @@ load helpers
 
 # --- _w_env_status_line ---
 
-@test "env_status_line returns empty when no env config" {
+@test "env_status_line returns empty when no .ports file" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
-  local root
-  root="$(_w_find_root)"
   local result
-  result="$(_w_env_status_line "main" "$root")"
+  result="$(_w_env_status_line "$TEST_DIR")"
   [[ -z "$result" ]]
 }
 
-@test "env_status_line shows computed port" {
+@test "env_status_line shows computed port from .ports" {
   source "$W_BIN" --source-only
   cd "$TEST_DIR"
-  local root
+  local root path
   root="$(_w_find_root)"
   cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
 [env]
 PORT = "{base:3000}"
 TOML
   _w_slot_assign "feat-x" "$root" > /dev/null
+  path="$(_w_resolve_path "$root" feat-x)"
+  mkdir -p "$path"
+  _w_write_ports "$path" "$root" "feat-x" "1"
   local result
-  result="$(_w_env_status_line "feat-x" "$root")"
+  result="$(_w_env_status_line "$path")"
   [[ "$result" == *"PORT=3001"* ]]
 }
 
@@ -60,8 +61,9 @@ TOML
 [env]
 PORT = "{base:3000}"
 TOML
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
   local result
-  result="$(_w_env_status_line "main" "$TEST_DIR")"
+  result="$(_w_env_status_line "$TEST_DIR")"
   [[ "$result" == *"PORT=3000"* ]]
 }
 

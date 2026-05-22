@@ -114,3 +114,78 @@ TOML
   [[ "$result" == *"PORT=3000"* ]]
   [[ "$result" == *"NODE_ENV=development"* ]]
 }
+
+# --- _w_write_ports / _w_read_ports ---
+
+@test "write_ports creates file with export lines" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+PORT = "{base:3000}"
+TOML
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
+  [[ -f "$TEST_DIR/.ports" ]]
+  grep -q '^export PORT=3000$' "$TEST_DIR/.ports"
+}
+
+@test "write_ports quotes values with spaces and special chars" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+MSG = "hello world & symbols"
+TOML
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
+  # Sourcing the file in a subshell should preserve the value exactly
+  local got
+  got="$(bash -c "source '$TEST_DIR/.ports' && printf '%s' \"\$MSG\"")"
+  [[ "$got" == "hello world & symbols" ]]
+}
+
+@test "write_ports removes stale file when no env section" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+PORT = "{base:3000}"
+TOML
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
+  [[ -f "$TEST_DIR/.ports" ]]
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[setup]
+commands = []
+TOML
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
+  [[ ! -f "$TEST_DIR/.ports" ]]
+}
+
+@test "write_ports leaves no file when there was never an env section" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
+  [[ ! -f "$TEST_DIR/.ports" ]]
+}
+
+@test "read_ports round-trips KEY=val pairs" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  cat > "$TEST_DIR/.wtconfig.toml" <<'TOML'
+[env]
+PORT = "{base:3000}"
+NODE_ENV = "development"
+TOML
+  _w_write_ports "$TEST_DIR" "$TEST_DIR" "main" "0"
+  local result
+  result="$(_w_read_ports "$TEST_DIR")"
+  [[ "$result" == *"PORT=3000"* ]]
+  [[ "$result" == *"NODE_ENV=development"* ]]
+}
+
+@test "read_ports returns nothing when file missing" {
+  source "$W_BIN" --source-only
+  cd "$TEST_DIR"
+  local result
+  result="$(_w_read_ports "$TEST_DIR")"
+  [[ -z "$result" ]]
+}
