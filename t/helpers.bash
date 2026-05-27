@@ -5,7 +5,7 @@ W_BIN="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/bin/w"
 
 setup() {
   # Create a temp directory for each test
-  TEST_DIR="$(mktemp -d)"
+  TEST_DIR="$(cd "$(mktemp -d)" && pwd -P)"
   # Initialize a git repo with an initial commit
   git -C "$TEST_DIR" init -b main --quiet
   git -C "$TEST_DIR" -c user.email=test@test.com -c user.name=Test commit --allow-empty -m "initial" --quiet
