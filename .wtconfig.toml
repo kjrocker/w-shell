@@ -1,0 +1,21 @@
+# Worktree directory layout (default: sibling directories)
+# Available tokens: {project}, {name}, {parent}, {home}
+# Examples:
+#   "{parent}/{project}.worktrees/{name}"  — subdirectory of project
+#   "{home}/worktrees/{project}/{name}"    — global worktree directory
+path = "{home}/repos/worktrees/{project}.{name}"
+
+# Setup commands run in the worktree directory after creation.
+# Available env vars: $W_ROOT (base repo path), $W_WORKTREE (branch name).
+[setup]
+commands = []
+# commands = ["npm install", "cp $W_ROOT/.env .env"]
+
+# Environment variables exported into the worktree subshell.
+# Use {base:N} for port allocation (N + worktree slot).
+# Use {name} for worktree name, {project} for project name.
+#
+# [env]
+# PORT = "{base:3000}"
+# API_PORT = "{base:8080}"
+# DATABASE_URL = "postgres://localhost/myapp_{name}"
